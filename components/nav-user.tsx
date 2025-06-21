@@ -3,9 +3,10 @@
 import {
   IconCreditCard,
   IconDotsVertical,
+  IconFidgetSpinner,
   IconLogout,
   IconNotification,
-  IconUserCircle,
+  IconUserCircle
 } from "@tabler/icons-react"
 
 import {
@@ -28,6 +29,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { useClerk } from "@clerk/nextjs"
 
 export function NavUser({
   user,
@@ -39,6 +41,7 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const { signOut } = useClerk()
 
   return (
     <SidebarMenu>
@@ -86,11 +89,15 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuItem>
                 <IconUserCircle />
-                Account
+                My Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <IconFidgetSpinner />
+                My Subscriptions
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <IconCreditCard />
-                Billing
+                My Billing
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <IconNotification />
@@ -98,9 +105,16 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <IconLogout />
-              Log out
+            <DropdownMenuItem
+              onClick={() => {
+                signOut(() => {
+                  // Redirect to homepage after signout
+                  window.location.replace("/");
+                });
+              }}
+            >
+              <IconLogout className="mr-2" />
+              <span>SignOut</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
