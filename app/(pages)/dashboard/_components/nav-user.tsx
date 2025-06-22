@@ -1,12 +1,13 @@
 "use client"
 
+import { PopoverTrigger } from "@/components/ui/popover"
+
 import {
   IconCreditCard,
   IconDotsVertical,
-  IconFidgetSpinner,
   IconLogout,
   IconNotification,
-  IconUserCircle
+  IconUserCircle,
 } from "@tabler/icons-react"
 
 import {
@@ -29,7 +30,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { useClerk } from "@clerk/nextjs"
 
 export function NavUser({
   user,
@@ -41,7 +41,6 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
-  const { signOut } = useClerk()
 
   return (
     <SidebarMenu>
@@ -87,17 +86,17 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <IconUserCircle />
-                My Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconFidgetSpinner />
-                My Subscriptions
-              </DropdownMenuItem>
+              <PopoverTrigger data-slot="user-profile" >
+                <DropdownMenuItem>
+
+                  <IconUserCircle />
+                  Profile
+
+                </DropdownMenuItem>
+              </PopoverTrigger>
               <DropdownMenuItem>
                 <IconCreditCard />
-                My Billing
+                Billing
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <IconNotification />
@@ -105,16 +104,9 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                signOut(() => {
-                  // Redirect to homepage after signout
-                  window.location.replace("/");
-                });
-              }}
-            >
-              <IconLogout className="mr-2" />
-              <span>SignOut</span>
+            <DropdownMenuItem>
+              <IconLogout />
+              Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
