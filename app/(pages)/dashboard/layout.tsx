@@ -4,13 +4,13 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
+import { usePathname } from "next/navigation"
 import { AppSidebar } from "./_components/app-sidebar"
 import { SiteHeader } from "./_components/site-header"
-import { usePathname } from "next/navigation"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  
+
   // Map routes to page titles
   const titleMap: Record<string, string> = {
     "/dashboard": "Dashboard",
@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     "/dashboard/plans": "Subscription Plans",
     "/dashboard/subscribers": "Subscribers",
   }
-  
+
   const title = titleMap[pathname] || "Dashboard"
 
   return (

@@ -27,4 +27,15 @@ export default defineSchema({
     lastLogin: v.optional(v.number()),
   }).index("by_token", ["tokenIdentifier"])
     .index("by_role", ["role"]),
+
+  media: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    mediaType: v.union(v.literal("audio"), v.literal("video")),
+    mediaUrl: v.string(), // CloudFlare R2 URL for audio, YouTube URL for video
+    thumbnailUrl: v.optional(v.string()),
+    duration: v.number(), // in seconds
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }),
 });

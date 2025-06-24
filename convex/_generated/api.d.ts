@@ -9,7 +9,9 @@
  */
 
 import type * as adminUsers from "../adminUsers.js";
+import type * as media from "../media.js";
 import type * as messages from "../messages.js";
+import type * as r2 from "../r2.js";
 import type * as subscriberUsers from "../subscriberUsers.js";
 
 import type {
@@ -28,7 +30,9 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   adminUsers: typeof adminUsers;
+  media: typeof media;
   messages: typeof messages;
+  r2: typeof r2;
   subscriberUsers: typeof subscriberUsers;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
