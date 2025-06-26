@@ -22,6 +22,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app/(pages)/dashboard/medias/_components/MediaFileUploader.backup", "app/(pages)/dashboard/medias/_components/AdminSetup.backup", "components/R2UploadTest.backup", "components/EnhancedR2UploadTest.backup", "components/media-upload-form.backup"],
   "exclude": ["node_modules"]
 }

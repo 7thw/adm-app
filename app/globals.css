@@ -41,8 +41,8 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --radius: 0.5rem;
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --tracking-tighter: calc(var(--tracking-normal) - 0.05em);
   --tracking-tight: calc(var(--tracking-normal) - 0.025em);
   --tracking-wide: calc(var(--tracking-normal) + 0.025em);
@@ -66,6 +66,7 @@
   --shadow-opacity: var(--shadow-opacity);
   --color-shadow-color: var(--shadow-color);
   --color-destructive-foreground: var(--destructive-foreground);
+
 }
 
 :root {
@@ -122,6 +123,18 @@
   --shadow-xl: 0px 0px 30px 0px hsl(0 0% 0% / 0.10), 0px 8px 10px -1px hsl(0 0% 0% / 0.10);
   --shadow-2xl: 0px 0px 30px 0px hsl(0 0% 0% / 0.25);
   --tracking-normal: 0.025em;
+
+    /* Animation timing variables */
+  --transition-fast: 150ms;
+  --transition-base: 300ms;
+  --transition-slow: 500ms;
+  --transition-slower: 700ms;
+
+  /* Animation easing variables */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .dark {
@@ -178,7 +191,6 @@
   --shadow-xl: 0px 0px 30px 0px hsl(0 0% 0% / 0.40), 0px 8px 10px -1px hsl(0 0% 0% / 0.40);
   --shadow-2xl: 0px 0px 30px 0px hsl(0 0% 0% / 1.00);
 }
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -187,4 +199,33 @@
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
   }
+}
+/* Animation Transitions */
+@layer animation {
+  .transition-fast {
+    transition-duration: var(--transition-fast);
+    transition-timing-function: var(--ease-out);
+  }
+  .transition-base {
+    transition-duration: var(--transition-base);
+    transition-timing-function: var(--ease-in-out);
+  }
+  .transition-slow {
+    transition-duration: var(--transition-slow);
+    transition-timing-function: var(--ease-in-out);
+  }
+}
+
+/* Progress bar styles */
+.upload-progress-bar {
+  width: 100%;
+  background-color: var(--color-background);
+  border-radius: var(--radius-md);
+  height: 0.625rem;
+}
+.upload-progress-bar-fill {
+  background-color: var(--color-primary);
+  height: 0.625rem;
+  border-radius: var(--radius-md);
+  transition: width var(--transition-base) var(--ease-out);
 }

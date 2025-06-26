@@ -1,0 +1,318 @@
+"use client";
+
+import { api } from "@/convex/_generated/api";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import * as z from "zod";
+
+// Import the useUploadFile hook from R2 component
+import { useUploadFile } from "@convex-dev/r2/react";
+import { useMutation } from "convex/react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, Music, Upload, Video, XCircle } from "lucide-react";
+
+// Import CSS for progress bar
+import "./form-media.css";
+
+const formSchema = z.object({
+  title: z.string().min(2, {
+    message: "Title must be at least 2 characters.",
+  }),
+  description: z.string().optional(),
+})
+
+export function FormMedia({ onSuccess }: { onSuccess?: () => void }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [dragActive, setDragActive] = useState(false)
+
+  // Use the useUploadFile hook for complete R2 integration
+  // This handles URL generation, upload, and metadata sync in one step
+  const uploadFile = useUploadFile(api.media)
+  
+  // Get a callable version of the handleSyncMetadata mutation
+  const updateMetadata = useMutation(api.media.handleSyncMetadata)
+
+  // 1. Define your form
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+    },
+  })
+
+  // 2. Define a submit handler using the useUploadFile hook
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!file) {
+      toast.error("Please select a file to upload")
+      return
+    }
+
+    setUploading(true)
+    setUploadProgress(0)
+
+    try {
+      console.log("🎵 Starting media upload:", {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        title: values.title
+      })
+
+      // Progress tracking
+      setUploadProgress(20)
+
+      // Create metadata to be stored with the file
+      // This will be available in the onUpload and onSyncMetadata callbacks
+      const metadata = {
+        title: values.title,
+        description: values.description || "",
+        mediaType: file.type.startsWith('audio/') ? "audio" : "video"
+      }
+
+      console.log("📝 Uploading file with metadata:", metadata)
+
+      // The useUploadFile hook handles all three steps:
+      // 1. Generate signed URL
+      // 2. Upload file to R2
+      // 3. Sync metadata to Convex database
+      setUploadProgress(40)
+
+      // Upload file to R2 - this returns the fileKey
+      const fileKey = await uploadFile(file)
+      
+      // Now update the media record with our form data
+      setUploadProgress(80)
+      await updateMetadata({
+        key: fileKey,
+        title: values.title,
+        description: values.description || "",
+        mediaType: file.type.startsWith('audio/') ? "audio" : "video"
+      })
+
+      console.log("✅ File uploaded successfully with key:", fileKey)
+      setUploadProgress(100)
+
+      // Show success message
+      toast.success("Media uploaded successfully!")
+
+      // Reset form
+      form.reset()
+      setFile(null)
+      setUploadProgress(0)
+      setUploading(false)
+
+      // Call success callback if provided
+      if (onSuccess) {
+        onSuccess()
+      }
+
+    } catch (error) {
+      console.error("❌ Upload failed:", error)
+      toast.error("Failed to upload media: " + (error instanceof Error ? error.message : String(error)))
+      setUploading(false)
+      setUploadProgress(0)
+    }
+  }
+
+  // Handle drag events
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true)
+    } else if (e.type === "dragleave") {
+      setDragActive(false)
+    }
+  }
+
+  // Handle drop
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const droppedFile = e.dataTransfer.files[0]
+      if (droppedFile.type.startsWith('audio/') || droppedFile.type.startsWith('video/')) {
+        setFile(droppedFile)
+        // Auto-fill title if empty
+        if (!form.getValues('title')) {
+          const nameWithoutExt = droppedFile.name.replace(/\.[^/.]+$/, "")
+          form.setValue('title', nameWithoutExt)
+        }
+      } else {
+        toast.error("Please select an audio or video file")
+      }
+    }
+  }
+
+  // Handle file input change
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0]
+      if (selectedFile.type.startsWith('audio/') || selectedFile.type.startsWith('video/')) {
+        setFile(selectedFile)
+        // Auto-fill title if empty
+        if (!form.getValues('title')) {
+          const nameWithoutExt = selectedFile.name.replace(/\.[^/.]+$/, "")
+          form.setValue('title', nameWithoutExt)
+        }
+      } else {
+        toast.error("Please select an audio or video file")
+      }
+    }
+  }
+
+  // Get file type icon
+  const getFileIcon = () => {
+    if (!file) return <Upload className="w-8 h-8 text-muted-foreground" />
+    if (file.type.startsWith('audio/')) return <Music className="w-8 h-8 text-blue-500" />
+    if (file.type.startsWith('video/')) return <Video className="w-8 h-8 text-purple-500" />
+    return <Upload className="w-8 h-8 text-muted-foreground" />
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="title"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Media Title</FormLabel>
+              <FormControl>
+                <Input placeholder="Enter media title" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description (Optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="Enter description" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="space-y-2">
+          <Label>Media File</Label>
+          <div
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${dragActive
+              ? 'border-primary bg-primary/5'
+              : file
+                ? 'border-green-300 bg-green-50'
+                : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+              }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+          >
+            <input
+              type="file"
+              accept="audio/*,video/*"
+              onChange={handleFileChange}
+              className="sr-only"
+              id="file-upload"
+            />
+
+            {file ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-center">
+                  {getFileIcon()}
+                </div>
+                <div>
+                  <p className="font-medium">{file.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {(file.size / 1024 / 1024).toFixed(2)} MB • {file.type}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFile(null)}
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Remove File
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-center">
+                  {getFileIcon()}
+                </div>
+                <div>
+                  <p className="font-medium">
+                    {dragActive ? "Drop your file here" : "Choose a media file"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Drag and drop or click to select • Audio or Video files
+                  </p>
+                </div>
+                <label htmlFor="file-upload">
+                  <Button type="button" variant="outline" size="sm" asChild>
+                    <span>Select File</span>
+                  </Button>
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {uploading && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Uploading... {uploadProgress}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-primary h-2 rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+
+        <Button type="submit" disabled={uploading || !file} className="w-full">
+          {uploading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Uploading...
+            </>
+          ) : (
+            <>
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Media
+            </>
+          )}
+        </Button>
+      </form>
+    </Form>
+  )
+}

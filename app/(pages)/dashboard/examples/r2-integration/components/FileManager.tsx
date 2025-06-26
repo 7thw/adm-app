@@ -31,9 +31,9 @@ interface FileManagerProps {
 
 interface FileMetadata {
   key: string
-  ContentType?: string
-  ContentLength?: number
-  LastModified?: string
+  contentType?: string
+  size?: number
+  lastModified?: string
 }
 
 export function FileManager({ refreshTrigger }: FileManagerProps) {
@@ -42,7 +42,8 @@ export function FileManager({ refreshTrigger }: FileManagerProps) {
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
 
   // Queries
-  const files = useQuery(api.r2.listFiles, { limit: 100 })
+  const filesResult = useQuery(api.r2.listFiles, { limit: 100 })
+  const files = filesResult?.page || []
 
   // Mutations
   const deleteFile = useMutation(api.r2.deleteFile)
@@ -122,10 +123,10 @@ export function FileManager({ refreshTrigger }: FileManagerProps) {
 
   const filteredFiles = files?.filter((file: FileMetadata) =>
     file.key.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    file.ContentType?.toLowerCase().includes(searchTerm.toLowerCase())
+    file.contentType?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || []
 
-  if (files === undefined) {
+  if (filesResult === undefined) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-center space-y-4">
@@ -201,7 +202,7 @@ export function FileManager({ refreshTrigger }: FileManagerProps) {
                   <TableRow key={file.key}>
                     <TableCell>
                       <div className="flex items-center space-x-3">
-                        {getFileIcon(file.ContentType)}
+                        {getFileIcon(file.contentType)}
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate" title={file.key}>
                             {file.key}
@@ -210,19 +211,19 @@ export function FileManager({ refreshTrigger }: FileManagerProps) {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {file.ContentType ? (
+                      {file.contentType ? (
                         <Badge variant="secondary" className="text-xs">
-                          {file.ContentType}
+                          {file.contentType}
                         </Badge>
                       ) : (
                         <span className="text-muted-foreground text-xs">Unknown</span>
                       )}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {formatFileSize(file.ContentLength)}
+                      {formatFileSize(file.size)}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(file.LastModified)}
+                      {formatDate(file.lastModified)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-1">
@@ -301,7 +302,7 @@ function FileDetails({ file, fileUrl }: { file: FileMetadata, fileUrl?: string }
     }
   }
 
-  const isImage = file.ContentType?.startsWith('image/')
+  const isImage = file.contentType?.startsWith('image/')
 
   return (
     <div className="space-y-6">
@@ -313,15 +314,15 @@ function FileDetails({ file, fileUrl }: { file: FileMetadata, fileUrl?: string }
         </div>
         <div className="space-y-2">
           <Label className="text-xs font-medium text-muted-foreground">CONTENT TYPE</Label>
-          <p className="text-sm">{file.ContentType || 'Unknown'}</p>
+          <p className="text-sm">{file.contentType || 'Unknown'}</p>
         </div>
         <div className="space-y-2">
           <Label className="text-xs font-medium text-muted-foreground">FILE SIZE</Label>
-          <p className="text-sm">{formatFileSize(file.ContentLength)}</p>
+          <p className="text-sm">{formatFileSize(file.size)}</p>
         </div>
         <div className="space-y-2">
           <Label className="text-xs font-medium text-muted-foreground">LAST MODIFIED</Label>
-          <p className="text-sm">{formatDate(file.LastModified)}</p>
+          <p className="text-sm">{formatDate(file.lastModified)}</p>
         </div>
       </div>
 

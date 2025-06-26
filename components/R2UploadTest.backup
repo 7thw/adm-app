@@ -1,0 +1,335 @@
+"use client"
+
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { api } from "@/convex/_generated/api"
+import { UserButton, useUser } from "@clerk/nextjs"
+import { useMutation, useQuery } from "convex/react"
+import { CheckCircle, Eye, Loader2, Upload, XCircle } from "lucide-react"
+import { useState } from "react"
+
+export default function R2UploadTest() {
+  const { isSignedIn, user, isLoaded } = useUser()
+  const [testResults, setTestResults] = useState<{
+    generateUrl?: { success: boolean; url?: string; error?: string }
+    uploadTest?: { success: boolean; error?: string }
+    retrieveTest?: { success: boolean; data?: any; error?: string }
+  }>({})
+
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Convex mutations and queries - only call if authenticated
+  const generateUploadUrl = useMutation(api.media.generateUploadUrl)
+  const getAllMedia = useQuery(api.media.getAllMedia, isSignedIn ? {} : "skip")
+
+  // Test 1: Generate Upload URL
+  const testGenerateUrl = async () => {
+    setIsLoading(true)
+    try {
+      console.log("🧪 Testing generateUploadUrl...")
+
+      // The r2.clientApi generateUploadUrl doesn't take any parameters
+      // It automatically generates a UUID key for the upload
+      const result = await generateUploadUrl()
+
+      console.log("✅ Upload URL generated:", result)
+
+      setTestResults(prev => ({
+        ...prev,
+        generateUrl: {
+          success: true,
+          url: result.url
+        }
+      }))
+
+    } catch (error) {
+      console.error("❌ Generate URL failed:", error)
+      setTestResults(prev => ({
+        ...prev,
+        generateUrl: {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error"
+        }
+      }))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Test 2: Test actual file upload (with a small test file)
+  const testFileUpload = async () => {
+    if (!testResults.generateUrl?.url) {
+      alert("Please generate an upload URL first!")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      console.log("🧪 Testing file upload...")
+
+      // Create a small test image (1x1 pixel PNG)
+      const canvas = document.createElement('canvas')
+      canvas.width = 1
+      canvas.height = 1
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.fillStyle = '#FF0000'
+        ctx.fillRect(0, 0, 1, 1)
+      }
+
+      // Convert to blob
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => resolve(blob!), 'image/png')
+      })
+
+      // Upload to R2
+      const response = await fetch(testResults.generateUrl.url, {
+        method: 'PUT',
+        body: blob,
+        headers: {
+          'Content-Type': 'image/png'
+        }
+      })
+
+      if (response.ok) {
+        console.log("✅ File upload successful!")
+        setTestResults(prev => ({
+          ...prev,
+          uploadTest: { success: true }
+        }))
+      } else {
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`)
+      }
+
+    } catch (error) {
+      console.error("❌ File upload failed:", error)
+      setTestResults(prev => ({
+        ...prev,
+        uploadTest: {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error"
+        }
+      }))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Test 3: Retrieve media list
+  const testRetrieveMedia = async () => {
+    setIsLoading(true)
+    try {
+      console.log("🧪 Testing media retrieval...")
+
+      // The useQuery will automatically refetch
+      if (getAllMedia) {
+        console.log("✅ Media retrieved:", getAllMedia)
+        setTestResults(prev => ({
+          ...prev,
+          retrieveTest: {
+            success: true,
+            data: getAllMedia
+          }
+        }))
+      } else {
+        throw new Error("No media data available")
+      }
+
+    } catch (error) {
+      console.error("❌ Media retrieval failed:", error)
+      setTestResults(prev => ({
+        ...prev,
+        retrieveTest: {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error"
+        }
+      }))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const TestResult = ({
+    title,
+    result,
+    details
+  }: {
+    title: string
+    result?: { success: boolean; error?: string }
+    details?: any
+  }) => (
+    <div className="flex items-center justify-between p-3 border rounded-lg">
+      <div className="flex items-center gap-2">
+        {result?.success === true && <CheckCircle className="w-5 h-5 text-green-500" />}
+        {result?.success === false && <XCircle className="w-5 h-5 text-red-500" />}
+        {result === undefined && <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />}
+        <span className="font-medium">{title}</span>
+      </div>
+      {result?.success === true && (
+        <Badge variant="secondary" className="text-green-700 bg-green-100">
+          Success
+        </Badge>
+      )}
+      {result?.success === false && (
+        <Badge variant="destructive">
+          Failed
+        </Badge>
+      )}
+      {result === undefined && (
+        <Badge variant="outline">
+          Not Tested
+        </Badge>
+      )}
+    </div>
+  )
+
+  return (
+    <Card className="w-full max-w-2xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Upload className="w-5 h-5" />
+          R2 Upload Integration Test
+        </CardTitle>
+        <CardDescription>
+          Test the Convex + Cloudflare R2 integration step by step
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-6">
+        {/* Authentication Status - Simple */}
+        {!isLoaded ? (
+          <div className="flex items-center gap-2 p-3 border rounded-lg">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Loading authentication...</span>
+          </div>
+        ) : isSignedIn ? (
+          <div className="flex items-center gap-2 p-3 border rounded-lg bg-green-50 border-green-200">
+            <CheckCircle className="w-5 h-5 text-green-500" />
+            <span className="font-medium">
+              Authenticated as {user?.emailAddresses[0]?.emailAddress || 'User'}
+            </span>
+            <UserButton />
+          </div>
+        ) : (
+          <div className="p-4 border rounded-lg bg-red-50 border-red-200">
+            <div className="flex items-center gap-2 mb-2">
+              <XCircle className="w-5 h-5 text-red-600" />
+              <span className="font-medium text-red-800">Not Authenticated</span>
+            </div>
+            <p className="text-sm text-red-700">
+              You should be redirected to sign in. If not, please go to <a href="/sign-in" className="underline">/sign-in</a>
+            </p>
+          </div>
+        )}
+
+        {/* Only show tests if authenticated */}
+        {isSignedIn && (
+          <>
+            {/* Test Results */}
+            <div className="space-y-2">
+              <h3 className="font-semibold">Test Results</h3>
+              <TestResult
+                title="Generate Upload URL"
+                result={testResults.generateUrl}
+              />
+              <TestResult
+                title="File Upload to R2"
+                result={testResults.uploadTest}
+              />
+              <TestResult
+                title="Retrieve Media List"
+                result={testResults.retrieveTest}
+              />
+            </div>
+
+            {/* Test Buttons */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={testGenerateUrl}
+                disabled={isLoading}
+                variant="outline"
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                1. Test Generate URL
+              </Button>
+
+              <Button
+                onClick={testFileUpload}
+                disabled={isLoading || !testResults.generateUrl?.success}
+                variant="outline"
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                2. Test Upload
+              </Button>
+
+              <Button
+                onClick={testRetrieveMedia}
+                disabled={isLoading}
+                variant="outline"
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                3. Test Retrieve
+              </Button>
+            </div>
+
+            {/* Error Details */}
+            {Object.values(testResults).some(result => result?.error) && (
+              <div className="space-y-2">
+                <h3 className="font-semibold text-red-600">Error Details</h3>
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  {testResults.generateUrl?.error && (
+                    <p className="text-sm text-red-700">
+                      <strong>Generate URL:</strong> {testResults.generateUrl.error}
+                    </p>
+                  )}
+                  {testResults.uploadTest?.error && (
+                    <p className="text-sm text-red-700">
+                      <strong>File Upload:</strong> {testResults.uploadTest.error}
+                    </p>
+                  )}
+                  {testResults.retrieveTest?.error && (
+                    <p className="text-sm text-red-700">
+                      <strong>Retrieve Media:</strong> {testResults.retrieveTest.error}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Success Details */}
+            {testResults.generateUrl?.url && (
+              <div className="space-y-2">
+                <h3 className="font-semibold text-green-600">Generated Upload URL</h3>
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-xs text-green-700 break-all">
+                    {testResults.generateUrl.url}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Media Data */}
+            {getAllMedia && getAllMedia.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Eye className="w-4 h-4" />
+                  Media Files ({getAllMedia.length})
+                </h3>
+                <div className="max-h-40 overflow-y-auto">
+                  {getAllMedia.map((media) => (
+                    <div key={media._id} className="p-2 border rounded text-sm">
+                      <p><strong>Type:</strong> {media.mediaType}</p>
+                      <p><strong>Size:</strong> {(media.fileSize / 1024).toFixed(1)} KB</p>
+                      <p><strong>Created:</strong> {new Date(media._creationTime).toLocaleString()}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}

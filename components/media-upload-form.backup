@@ -1,0 +1,309 @@
+// components/media-upload-form.tsx
+"use client"
+
+import { useState, useRef, FormEvent } from "react"
+import { useMutation } from "convex/react"
+import { api } from "@/convex/_generated/api"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Upload, Video, Music, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+
+interface MediaUploadFormProps {
+  onSuccess?: () => void
+}
+
+export default function MediaUploadForm({ onSuccess }: MediaUploadFormProps) {
+  const [mediaType, setMediaType] = useState<"audio" | "video">("audio")
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [youtubeUrl, setYoutubeUrl] = useState("")
+  const [duration, setDuration] = useState<number>(0)
+  const [isUploading, setIsUploading] = useState(false)
+  
+  const audioFileRef = useRef<HTMLInputElement>(null)
+  const [selectedAudioFile, setSelectedAudioFile] = useState<File | null>(null)
+  
+  // Convex hooks
+  const generateAudioUploadUrl = useMutation(api.media.generateAudioUploadUrl)
+  const createVideoMedia = useMutation(api.media.createVideoMedia)
+
+  // Validate YouTube URL
+  const isValidYouTubeUrl = (url: string): boolean => {
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[a-zA-Z0-9_-]{11}$/
+    return youtubeRegex.test(url)
+  }
+
+  // Extract duration from audio file
+  const getAudioDuration = (file: File): Promise<number> => {
+    return new Promise((resolve) => {
+      const audio = document.createElement('audio')
+      audio.preload = 'metadata'
+      
+      audio.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(audio.src)
+        resolve(audio.duration)
+      }
+      
+      audio.onerror = () => {
+        resolve(0) // Fallback if duration can't be determined
+      }
+      
+      audio.src = window.URL.createObjectURL(file)
+    })
+  }
+  const handleAudioFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('audio/')) {
+        toast.error("Please select a valid audio file")
+        return
+      }
+      
+      // Validate file size (50MB limit)
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error("File size must be less than 50MB")
+        return
+      }
+      
+      setSelectedAudioFile(file)
+      
+      // Auto-extract duration
+      try {
+        const audioDuration = await getAudioDuration(file)
+        setDuration(Math.round(audioDuration))
+      } catch (error) {
+        console.error("Error getting audio duration:", error)
+      }
+    }
+  }
+
+  const validateForm = (): boolean => {
+    if (!title.trim()) {
+      toast.error("Title is required")
+      return false
+    }
+
+    if (mediaType === "audio") {
+      if (!selectedAudioFile) {
+        toast.error("Please select an audio file")
+        return false
+      }
+    } else {
+      if (!youtubeUrl.trim()) {
+        toast.error("YouTube URL is required")
+        return false
+      }
+      
+      if (!isValidYouTubeUrl(youtubeUrl)) {
+        toast.error("Please enter a valid YouTube URL")
+        return false
+      }
+    }
+
+    if (duration <= 0) {
+      toast.error("Duration must be greater than 0")
+      return false
+    }
+
+    return true
+  }
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    
+    if (!validateForm()) return
+    
+    setIsUploading(true)
+    
+    try {
+      if (mediaType === "audio" && selectedAudioFile) {
+        // Generate upload URL with metadata
+        const uploadData = await generateAudioUploadUrl({
+          title: title.trim(),
+          description: description.trim(),
+          duration,
+        })
+        
+        // Upload file directly to R2
+        const response = await fetch(uploadData.uploadUrl, {
+          method: 'PUT',
+          body: selectedAudioFile,
+          headers: {
+            'Content-Type': selectedAudioFile.type,
+          },
+        })
+        
+        if (!response.ok) {
+          throw new Error('Upload failed')
+        }
+        
+        toast.success("Audio uploaded successfully!")
+      } else {
+        // Create video media record with YouTube URL
+        await createVideoMedia({
+          title: title.trim(),
+          description: description.trim(),
+          mediaUrl: youtubeUrl.trim(),
+          duration,
+        })
+        
+        toast.success("Video media created successfully!")
+      }
+      
+      // Reset form
+      setTitle("")
+      setDescription("")
+      setYoutubeUrl("")
+      setDuration(0)
+      setSelectedAudioFile(null)
+      if (audioFileRef.current) {
+        audioFileRef.current.value = ""
+      }
+      
+      onSuccess?.()
+      
+    } catch (error) {
+      console.error("Upload error:", error)
+      toast.error("Failed to create media. Please try again.")
+    } finally {
+      setIsUploading(false)
+    }
+  }
+  return (
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Upload className="h-5 w-5" />
+          Upload Media
+        </CardTitle>
+        <CardDescription>
+          Upload audio files or add YouTube videos to your media library
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          
+          {/* Media Type Selection */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Media Type</Label>
+            <RadioGroup
+              value={mediaType}
+              onValueChange={(value) => setMediaType(value as "audio" | "video")}
+              className="flex space-x-6"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="audio" id="audio" />
+                <Label htmlFor="audio" className="flex items-center gap-2 cursor-pointer">
+                  <Music className="h-4 w-4" />
+                  Audio File
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="video" id="video" />
+                <Label htmlFor="video" className="flex items-center gap-2 cursor-pointer">
+                  <Video className="h-4 w-4" />
+                  YouTube Video
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {/* Title */}
+          <div className="space-y-2">
+            <Label htmlFor="title">Title *</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter media title"
+              required
+            />
+          </div>
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter media description (optional)"
+              rows={3}
+            />
+          </div>
+
+          {/* Audio File Upload */}
+          {mediaType === "audio" && (
+            <div className="space-y-2">
+              <Label htmlFor="audio-file">Audio File *</Label>
+              <Input
+                id="audio-file"
+                type="file"
+                accept="audio/*"
+                ref={audioFileRef}
+                onChange={handleAudioFileChange}
+                required
+              />
+              {selectedAudioFile && (
+                <p className="text-sm text-muted-foreground">
+                  Selected: {selectedAudioFile.name} ({(selectedAudioFile.size / 1024 / 1024).toFixed(2)} MB)
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* YouTube URL */}
+          {mediaType === "video" && (
+            <div className="space-y-2">
+              <Label htmlFor="youtube-url">YouTube URL *</Label>
+              <Input
+                id="youtube-url"
+                type="url"
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                required
+              />
+            </div>
+          )}
+          {/* Duration */}
+          <div className="space-y-2">
+            <Label htmlFor="duration">Duration (seconds) *</Label>
+            <Input
+              id="duration"
+              type="number"
+              min="1"
+              value={duration}
+              onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
+              placeholder="Enter duration in seconds"
+              required
+            />
+            {duration > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Duration: {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')}
+              </p>
+            )}
+          </div>
+
+          {/* Submit Button */}
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isUploading}
+          >
+            {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isUploading 
+              ? `Uploading ${mediaType}...` 
+              : `Create ${mediaType === "audio" ? "Audio" : "Video"} Media`
+            }
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}

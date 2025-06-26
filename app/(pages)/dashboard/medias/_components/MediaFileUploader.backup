@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { AlertCircleIcon, FileIcon, UploadIcon, XIcon } from "lucide-react"
-import { useUploadFile } from "@convex-dev/r2/react"
-import { api } from "@/convex/_generated/api"
-import { useMutation } from "convex/react"
-import { useFileUpload } from "@/hooks/use-file-upload"
 import { Button } from "@/components/ui/button"
+import { api } from "@/convex/_generated/api"
+import { useFileUpload } from "@/hooks/use-file-upload"
+import { useUploadFile } from "@convex-dev/r2/react"
+import { useMutation } from "convex/react"
+import { AlertCircleIcon, FileIcon, UploadIcon, XIcon } from "lucide-react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 // Import the CSS for the progress bar
@@ -35,9 +35,9 @@ export default function MediaFileUploader({
   // Use the Convex R2 useUploadFile hook
   // This hook returns a function that we can call with a file and options
   const uploadFileFn = useUploadFile(api.media)
-  
+
   // Get the handleMetadataSync mutation
-  const handleMetadataSync = useMutation(api.media.handleMetadataSync)
+  const handleMetadataSync = useMutation(api.media.handleSyncMetadata)
 
   // Set accept types based on mediaType
   const acceptTypes = mediaType === "audio"
@@ -68,7 +68,7 @@ export default function MediaFileUploader({
 
   const selectedFile = files[0]?.file as File
   const fileName = files[0]?.file.name || null
-  
+
   // Call onFileChange prop when files change
   useEffect(() => {
     if (onFileChange) {
@@ -90,28 +90,28 @@ export default function MediaFileUploader({
       // Generate a unique file path/name
       const fileExtension = selectedFile.name.split(".").pop()
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExtension}`
-      
+
       // Use the uploadFile function from the hook
       // This handles URL generation and upload but we need to manually sync metadata
       const key = await uploadFileFn(selectedFile);
-      
+
       // After upload completes, call handleMetadataSync to process the file metadata
       await handleMetadataSync({ key });
-      
+
       // Track progress manually since we can't use the onProgress option
       setUploadProgress(100)
-      
+
       toast.success("File uploaded successfully")
       clearFiles()
       setIsUploading(false)
       setUploadProgress(0)
-      
+
       // Call the onUploadComplete callback if provided
       if (onUploadComplete) {
         // The key can be used as an identifier
         onUploadComplete(key)
       }
-      
+
     } catch (error) {
       console.error("Upload error:", error)
       toast.error("Failed to upload file")

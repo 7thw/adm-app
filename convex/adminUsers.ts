@@ -10,7 +10,7 @@ export const getAdminUser = query({
 
     const user = await ctx.db
       .query("adminUsers")
-      .filter((q) => q.eq(q.field("tokenIdentifier"), identity.tokenIdentifier))
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
       .first();
 
     if (!user || user.role !== "admin") {
@@ -31,7 +31,7 @@ export const getAllUsers = query({
     // Check if user is an admin
     const user = await ctx.db
       .query("adminUsers")
-      .filter((q) => q.eq(q.field("tokenIdentifier"), identity.tokenIdentifier))
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
       .first();
 
     if (!user || user.role !== "admin") {
@@ -78,11 +78,15 @@ export const storeAdminUser = mutation({
 
     // If it's a new identity, create a new admin user
     return await ctx.db.insert("adminUsers", {
+      clerkId: identity.subject ?? identity.tokenIdentifier.split("|")[1],
       name: identity.name ?? "Admin",
       tokenIdentifier: identity.tokenIdentifier,
       role: "admin",
-      email: args.email ?? identity.email,
+      subscriptionStatus: "active", // Default subscription status for admins
+      email: args.email ?? identity.email ?? "", // Ensure email is never undefined
       lastLogin: Date.now(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     });
   },
 });

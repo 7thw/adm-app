@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Button } from '@/components/ui/button'
@@ -40,7 +40,8 @@ export function FileViewer({ refreshTrigger }: FileViewerProps) {
   const [customKey, setCustomKey] = useState('')
   
   // Queries
-  const files = useQuery(api.r2.listFiles, { limit: 100 })
+  const filesResult = useQuery(api.r2.listFiles, { limit: 100 })
+  const files = filesResult?.page || []
   const fileUrl = useQuery(api.r2.getFileUrl, 
     selectedKey ? { key: selectedKey, expiresIn: expirationTime } : 'skip'
   )
@@ -130,7 +131,7 @@ export function FileViewer({ refreshTrigger }: FileViewerProps) {
   const renderPreview = () => {
     if (!fileUrl || !fileMetadata) return null
 
-    const contentType = fileMetadata.ContentType
+    const contentType = fileMetadata.contentType
     
     if (contentType?.startsWith('image/')) {
       return (
@@ -257,7 +258,7 @@ export function FileViewer({ refreshTrigger }: FileViewerProps) {
                   {files?.map((file) => (
                     <SelectItem key={file.key} value={file.key}>
                       <div className="flex items-center gap-2">
-                        {getFileIcon(file.ContentType)}
+                        {getFileIcon(file.contentType)}
                         <span className="truncate">{file.key}</span>
                       </div>
                     </SelectItem>
@@ -324,9 +325,9 @@ export function FileViewer({ refreshTrigger }: FileViewerProps) {
               
               <div className="space-y-2">
                 <Label>File Type</Label>
-                {fileMetadata?.ContentType ? (
+                {fileMetadata?.contentType ? (
                   <Badge variant="secondary" className="w-full justify-center">
-                    {fileMetadata.ContentType}
+                    {fileMetadata.contentType}
                   </Badge>
                 ) : (
                   <div className="text-sm text-muted-foreground">Loading...</div>
@@ -342,7 +343,7 @@ export function FileViewer({ refreshTrigger }: FileViewerProps) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              {getFileIcon(fileMetadata.ContentType)}
+              {getFileIcon(fileMetadata.contentType)}
               File Information
             </CardTitle>
           </CardHeader>
@@ -350,20 +351,20 @@ export function FileViewer({ refreshTrigger }: FileViewerProps) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1">
                 <Label className="text-xs font-medium text-muted-foreground">SIZE</Label>
-                <p className="text-sm">{formatFileSize(fileMetadata.ContentLength)}</p>
+                <p className="text-sm">{formatFileSize(fileMetadata.size)}</p>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-medium text-muted-foreground">LAST MODIFIED</Label>
                 <p className="text-sm">
-                  {fileMetadata.LastModified 
-                    ? new Date(fileMetadata.LastModified).toLocaleString()
+                  {fileMetadata.lastModified 
+                    ? new Date(fileMetadata.lastModified).toLocaleString()
                     : 'Unknown'
                   }
                 </p>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-medium text-muted-foreground">CONTENT TYPE</Label>
-                <p className="text-sm">{fileMetadata.ContentType || 'Unknown'}</p>
+                <p className="text-sm">{fileMetadata.contentType || 'Unknown'}</p>
               </div>
             </div>
           </CardContent>

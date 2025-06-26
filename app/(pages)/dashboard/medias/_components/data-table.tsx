@@ -1,24 +1,7 @@
 "use client"
 
-import {
-  closestCenter,
-  DndContext,
-  KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type UniqueIdentifier,
-} from "@dnd-kit/core"
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
-import {
-  arrayMove,
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
+import { api } from "@/convex/_generated/api"
+import { type UniqueIdentifier } from "@dnd-kit/core"
 import {
   IconChevronDown,
   IconChevronLeft,
@@ -26,10 +9,9 @@ import {
   IconChevronsLeft,
   IconChevronsRight,
   IconDotsVertical,
-  IconGripVertical,
   IconLayoutColumns,
-  IconPlus,
-  IconTrendingUp
+  IconPlayerPlayFilled,
+  IconPlus
 } from "@tabler/icons-react"
 import {
   ColumnDef,
@@ -46,18 +28,27 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import * as React from "react"
 import { useMutation } from "convex/react"
-import { api } from "@/convex/_generated/api"
+import * as React from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 
+import MediaPlayer from "@/components/medias/MediaPlayer"
+import MediaInfo from "@/components/medias/media-info"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   ChartConfig
 } from "@/components/ui/chart"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import {
   Drawer,
   DrawerClose,
@@ -79,11 +70,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -104,7 +90,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import { FormMedia } from "./FormMedia"
+import FormMedia from "./FormMedia"
 
 export const schema = z.object({
   _id: z.any(), // Convex ID
@@ -116,27 +102,15 @@ export const schema = z.object({
   updatedAt: z.number(),
   description: z.string().optional(),
   thumbnailUrl: z.string().optional(),
+  fileSize: z.number().optional(),
+  contentType: z.string().optional(),
+  uploadKey: z.string().optional(),
+  userId: z.string().optional(),
+  uploadStatus: z.string().optional(),
+  _creationTime: z.number().optional(),
 })
 
-// Create a separate component for the drag handle
-function DragHandle({ id }: { id: string }) {
-  const { attributes, listeners } = useSortable({
-    id,
-  })
-
-  return (
-    <Button
-      {...attributes}
-      {...listeners}
-      variant="ghost"
-      size="icon"
-      className="text-muted-foreground size-7 hover:bg-transparent"
-    >
-      <IconGripVertical className="text-muted-foreground size-3" />
-      <span className="sr-only">Drag to reorder</span>
-    </Button>
-  )
-}
+// Drag functionality has been removed
 
 export const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
@@ -217,18 +191,85 @@ export const columns: ColumnDef<z.infer<typeof schema>>[] = [
     id: "play",
     header: "",
     cell: ({ row }) => {
-      const mediaUrl = row.original.mediaUrl;
+      const media = row.original;
+
+      // Try to determine the actual media URL
+      let actualMediaUrl = media.mediaUrl;
+
+      // If mediaUrl is empty but we have an uploadKey, try to construct the URL
+      if ((!actualMediaUrl || actualMediaUrl.trim() === "") && media.uploadKey) {
+        // Check if it's a UUID (R2 generated key) or custom key
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(media.uploadKey);
+        // Use R2 custom domain URL regardless of UUID or not
+        actualMediaUrl = `https://r2-realigna.7thw.co/${media.uploadKey}`;
+      }
+
+      // Ensure URL is properly formed
+      if (actualMediaUrl && !actualMediaUrl.startsWith('http')) {
+        actualMediaUrl = `https://${actualMediaUrl}`;
+      }
+      
+      // Debug the URL to help troubleshoot
+      if (actualMediaUrl) {
+        console.log(`Media URL for ${media.title}:`, actualMediaUrl);
+      } else {
+        console.warn(`No URL found for media ${media.title}`);
+      }
+
+      const hasValidUrl = actualMediaUrl && actualMediaUrl.trim() !== "";
+
+      if (!hasValidUrl) {
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled
+            className="text-muted-foreground/50"
+            title="Media URL not available"
+          >
+            <IconPlayerPlayFilled className="h-4 w-4" />
+            <span className="sr-only">No media available</span>
+          </Button>
+        );
+      }
 
       return (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => window.open(mediaUrl, '_blank')}
-          className="text-muted-foreground"
-        >
-          <IconTrendingUp className="h-4 w-4" />
-          <span className="sr-only">Play</span>
-        </Button>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-primary"
+              title={`Play ${media.title}`}
+            >
+              <IconPlayerPlayFilled className="h-4 w-4" />
+              <span className="sr-only">Play {media.title}</span>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Play Media</DialogTitle>
+            </DialogHeader>
+            <MediaPlayer
+              className="flex-1 w-[100%]"
+              src={actualMediaUrl}
+              title={media.title}
+              description={media.description}
+              onError={(error) => {
+                console.error("Media playback error:", error);
+                toast.error(`Playback failed: ${error}`);
+              }}
+            />
+            <div className="flex-1">
+              <MediaInfo
+                media={media}
+                url={actualMediaUrl}
+                showDebugInfo={true}
+              />
+            </div>
+
+          </DialogContent>
+        </Dialog>
       );
     },
   },
@@ -237,7 +278,7 @@ export const columns: ColumnDef<z.infer<typeof schema>>[] = [
     cell: ({ row }) => {
       // Get the delete media mutation from Convex
       const deleteMediaMutation = useMutation(api.media.deleteMedia);
-      
+
       const handleDelete = async () => {
         if (window.confirm(`Are you sure you want to delete ${row.original.title}?`)) {
           try {
@@ -249,7 +290,7 @@ export const columns: ColumnDef<z.infer<typeof schema>>[] = [
           }
         }
       };
-      
+
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -265,8 +306,8 @@ export const columns: ColumnDef<z.infer<typeof schema>>[] = [
           <DropdownMenuContent align="end" className="w-32">
             <DropdownMenuItem>Edit</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              variant="destructive" 
+            <DropdownMenuItem
+              variant="destructive"
               onClick={handleDelete}
             >
               Delete
@@ -278,22 +319,9 @@ export const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
 ]
 
-function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
-  const { transform, transition, setNodeRef, isDragging } = useSortable({
-    id: row.original._id?.toString() || "",
-  })
-
+function DataTableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
   return (
-    <TableRow
-      data-state={row.getIsSelected() && "selected"}
-      data-dragging={isDragging}
-      ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition: transition,
-      }}
-    >
+    <TableRow data-state={row.getIsSelected() && "selected"}>
       {row.getVisibleCells().map((cell) => (
         <TableCell key={cell.id}>
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -308,9 +336,15 @@ export function DataTable({
 }: {
   data: z.infer<typeof schema>[]
 }) {
+  const [dialogOpen, setDialogOpen] = React.useState(false)
+  const [data, setData] = React.useState<z.infer<typeof schema>[]>(initialData)
   const deleteMediaMutation = useMutation(api.media.deleteMedia);
-  
-  const [data, setData] = React.useState(() => initialData)
+
+  // Update data when initialData changes
+  React.useEffect(() => {
+    setData(initialData)
+  }, [initialData])
+
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
@@ -322,13 +356,6 @@ export function DataTable({
     pageIndex: 0,
     pageSize: 10,
   })
-  const sortableId = React.useId()
-  const sensors = useSensors(
-    useSensor(MouseSensor, {}),
-    useSensor(TouchSensor, {}),
-    useSensor(KeyboardSensor, {})
-  )
-
   const dataIds = React.useMemo<UniqueIdentifier[]>(
     () => data?.map(({ _id }) => _id) || [],
     [data]
@@ -348,8 +375,8 @@ export function DataTable({
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
+    onColumnFiltersChange: setColumnFilters,
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -359,16 +386,14 @@ export function DataTable({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (active && over && active.id !== over.id) {
-      setData((data) => {
-        const oldIndex = dataIds.indexOf(active.id)
-        const newIndex = dataIds.indexOf(over.id)
-        return arrayMove(data, oldIndex, newIndex)
-      })
-    }
+  // Function to refresh data after new media is added
+  const refreshData = () => {
+    // Force re-render with the latest data
+    setData([...initialData])
+    table.resetRowSelection()
   }
+
+  // Drag functionality has been removed
 
   return (
     <Tabs
@@ -436,81 +461,75 @@ export function DataTable({
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Popover>
-            <PopoverTrigger asChild>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
               <Button variant="outline" size="sm">
                 <IconPlus />
                 <span className="hidden lg:inline">Add Media</span>
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80">
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium leading-none">Upload Media</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Upload audio or video files to your media library
-                  </p>
-                </div>
-                <FormMedia />
+            </DialogTrigger>
+            <DialogContent className="max-w-[320px]">
+              <DialogHeader>
+                <DialogTitle>Add New Media</DialogTitle>
+                <DialogDescription>
+                  Upload audio or video files to your media library
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-4">
+                <FormMedia
+                  onSuccess={() => {
+                    // Close the dialog
+                    setDialogOpen(false);
+                    // Refresh the data
+                    refreshData();
+                  }}
+                />
               </div>
-            </PopoverContent>
-          </Popover>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
       <TabsContent
         value="outline"
         className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
       >
-        <div className="overflow-hidden rounded-lg border">
-          <DndContext
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
-            onDragEnd={handleDragEnd}
-            sensors={sensors}
-            id={sortableId}
-          >
-            <Table>
-              <TableHeader className="bg-muted sticky top-0 z-10">
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id} colSpan={header.colSpan}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                        </TableHead>
-                      )
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody className="**:data-[slot=table-cell]:first:w-8">
-                {table.getRowModel().rows?.length ? (
-                  <SortableContext
-                    items={dataIds}
-                    strategy={verticalListSortingStrategy}
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    return (
+                      <TableHead key={header.id}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                      </TableHead>
+                    )
+                  })}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <DataTableRow key={row.id} row={row} />
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center"
                   >
-                    {table.getRowModel().rows.map((row) => (
-                      <DraggableRow key={row.id} row={row} />
-                    ))}
-                  </SortableContext>
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      No results.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </DndContext>
+                    No results.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
         <div className="flex items-center justify-between px-4">
           <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">

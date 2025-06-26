@@ -10,7 +10,7 @@ export const getSubscriberUser = query({
 
     return await ctx.db
       .query("subscriberUsers")
-      .filter((q) => q.eq(q.field("tokenIdentifier"), identity.tokenIdentifier))
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
       .first();
   },
 });
@@ -44,11 +44,15 @@ export const storeSubscriberUser = mutation({
 
     // If it's a new identity, create a new subscriber user
     return await ctx.db.insert("subscriberUsers", {
+      clerkId: identity.subject ?? identity.tokenIdentifier.split("|")[1],
       name: identity.name ?? "Subscriber",
       tokenIdentifier: identity.tokenIdentifier,
       role: "subscriber",
-      email: args.email ?? identity.email,
+      subscriptionStatus: "inactive", // Default subscription status
+      email: args.email ?? identity.email ?? "", // Ensure email is never undefined
       lastLogin: Date.now(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     });
   },
 });

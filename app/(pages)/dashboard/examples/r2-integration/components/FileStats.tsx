@@ -36,7 +36,8 @@ interface FileStatsProps {
 
 export function FileStats({ refreshTrigger }: FileStatsProps) {
   const stats = useQuery(api.r2.getFileStats)
-  const files = useQuery(api.r2.listFiles, { limit: 1000 })
+  const filesResult = useQuery(api.r2.listFiles, { limit: 1000 })
+  const files = filesResult?.page || []
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
@@ -67,14 +68,14 @@ export function FileStats({ refreshTrigger }: FileStatsProps) {
     Object.entries(stats.fileTypes).map(([type, count]) => ({
       type: type.split('/')[0] || 'other',
       fullType: type,
-      count,
+      count: count as number,
       color: getFileTypeColor(type)
-    })).sort((a, b) => (b.count as number) - (a.count as number)) : []
+    })).sort((a, b) => b.count - a.count) : []
 
   // Process file size distribution
   const sizeDistribution = files ?
     files.reduce((acc: any, file: any) => {
-      const size = file.ContentLength || 0
+      const size = file.size || 0
       let category = '0 B'
 
       if (size === 0) category = '0 B'
@@ -96,24 +97,30 @@ export function FileStats({ refreshTrigger }: FileStatsProps) {
   // Process upload timeline (last 30 days)
   const uploadTimeline = files ?
     files.reduce((acc: any, file: any) => {
-      if (!file.LastModified) return acc
+      if (!file.lastModified) return acc
 
-      const date = new Date(file.LastModified)
+      const date = new Date(file.lastModified)
       const dayKey = date.toISOString().split('T')[0]
 
       acc[dayKey] = (acc[dayKey] || 0) + 1
       return acc
     }, {} as Record<string, number>) : {}
 
-  const timelineData = Object.entries(uploadTimeline)
+  // Define the type for timeline data items
+  interface TimelineDataItem {
+    date: string;
+    count: number;
+  }
+
+  const timelineData: TimelineDataItem[] = Object.entries(uploadTimeline)
     .sort(([a], [b]) => a.localeCompare(b))
     .slice(-30) // Last 30 days
     .map(([date, count]) => ({
       date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      count
+      count: count as number
     }))
 
-  if (stats === undefined || files === undefined) {
+  if (stats === undefined || filesResult === undefined) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-center space-y-4">
@@ -319,7 +326,7 @@ export function FileStats({ refreshTrigger }: FileStatsProps) {
                 <span className="text-sm font-medium">Growth Rate</span>
                 <span className="text-sm text-muted-foreground">
                   {timelineData.length > 0 ?
-                    `${timelineData.reduce((sum: number, day: any) => sum + day.count, 0)} recent` :
+                    `${timelineData.reduce((sum, day) => (sum + day.count), 0)} recent` :
                     'No recent uploads'
                   }
                 </span>
