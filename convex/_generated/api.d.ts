@@ -13,8 +13,13 @@ import type * as adminUsers from "../adminUsers.js";
 import type * as auth from "../auth.js";
 import type * as authClerk from "../authClerk.js";
 import type * as clearDatabase from "../clearDatabase.js";
+import type * as corePlaylists from "../corePlaylists.js";
+import type * as coreSectionMedia from "../coreSectionMedia.js";
+import type * as coreSections from "../coreSections.js";
 import type * as media from "../media.js";
 import type * as messages from "../messages.js";
+import type * as playlistCategories from "../playlistCategories.js";
+import type * as playlistCategoriesSetup from "../playlistCategoriesSetup.js";
 import type * as r2Upload from "../r2Upload.js";
 import type * as subscriberUsers from "../subscriberUsers.js";
 
@@ -38,8 +43,13 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authClerk: typeof authClerk;
   clearDatabase: typeof clearDatabase;
+  corePlaylists: typeof corePlaylists;
+  coreSectionMedia: typeof coreSectionMedia;
+  coreSections: typeof coreSections;
   media: typeof media;
   messages: typeof messages;
+  playlistCategories: typeof playlistCategories;
+  playlistCategoriesSetup: typeof playlistCategoriesSetup;
   r2Upload: typeof r2Upload;
   subscriberUsers: typeof subscriberUsers;
 }>;

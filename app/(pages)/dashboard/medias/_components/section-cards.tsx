@@ -1,6 +1,6 @@
 import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
-import { IconMusic, IconTrendingUp, IconVideo } from "@tabler/icons-react";
+import { IconMusic, IconVideo } from "@tabler/icons-react";
 import { useQuery } from "convex/react";
 
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +8,7 @@ import {
   Card,
   CardAction,
   CardDescription,
-  CardHeader,
-  CardTitle
+  CardHeader
 } from "@/components/ui/card";
 
 export function SectionCards() {
@@ -31,13 +30,9 @@ export function SectionCards() {
             <IconMusic className="w-4 h-4" />
             Audio Files
           </CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {audioCount}
-          </CardTitle>
           <CardAction>
             <Badge variant="outline">
-              <IconTrendingUp />
-              {audioCount > 0 ? `${Math.round((audioCount / totalCount) * 100)}%` : '0%'}
+              {audioCount}
             </Badge>
           </CardAction>
         </CardHeader>
@@ -48,27 +43,19 @@ export function SectionCards() {
             <IconVideo className="w-4 h-4" />
             Video Files
           </CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {videoCount}
-          </CardTitle>
           <CardAction>
             <Badge variant="outline">
-              <IconTrendingUp />
-              {videoCount > 0 ? `${Math.round((videoCount / totalCount) * 100)}%` : '0%'}
+              {videoCount}
             </Badge>
           </CardAction>
         </CardHeader>
       </Card>
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>Total Media</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {totalCount}
-          </CardTitle>
+          <CardDescription>Total Medias</CardDescription>
           <CardAction>
             <Badge variant="outline">
-              <IconTrendingUp />
-              Active
+              {totalCount}
             </Badge>
           </CardAction>
         </CardHeader>

@@ -3,8 +3,7 @@ import { R2 } from "@convex-dev/r2";
 import { v } from "convex/values";
 import { components } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
-import { requireAdminClerk, requireAuth, isCurrentUserAdmin } from "./authClerk";
-import { Id } from "./_generated/dataModel";
+import { requireAdminClerk, requireAuth } from "./authClerk";
 
 // Initialize R2 component exactly like the official examples
 export const r2 = new R2(components.r2);
@@ -138,7 +137,7 @@ export const getAllMedia = query({
   },
   handler: async (ctx, { limit = 50 }) => {
     await requireAdminClerk(ctx, "media:getAllMedia");
-    
+
     return await ctx.db.query("media").order("desc").take(limit);
   },
 });
@@ -206,11 +205,12 @@ export const deleteMedia = mutation({
       throw new Error("Media not found");
     }
 
-    // If it's an audio file, delete from R2 as well
-    if (media.mediaType === "audio" && media.uploadKey) {
+    // Delete the file from R2 if it has an uploadKey (works for both audio and video)
+    if (media.uploadKey) {
       try {
-        // Use Convex storage delete (fallback approach)
-        await ctx.storage.delete(media.uploadKey as any);
+        // Use R2 deleteObject method to properly delete from Cloudflare R2
+        await r2.deleteObject(ctx, media.uploadKey);
+        console.log(`Successfully deleted file ${media.uploadKey} from R2`);
       } catch (error) {
         console.error("Failed to delete file from R2:", error);
         // Continue with database deletion even if R2 deletion fails
@@ -255,23 +255,23 @@ export const cleanupFailedUploads = mutation({
   args: {},
   handler: async (ctx) => {
     await requireAdminClerk(ctx, "media:cleanupFailedUploads");
-    
+
     // Find all pending uploads older than 1 hour
     const oneHourAgo = Date.now() - (60 * 60 * 1000);
-    
+
     const staleUploads = await ctx.db
       .query("media")
       .filter((q) => q.eq(q.field("uploadStatus"), "pending"))
       .filter((q) => q.lt(q.field("createdAt"), oneHourAgo))
       .collect();
-    
+
     for (const upload of staleUploads) {
       await ctx.db.patch(upload._id, {
         uploadStatus: "failed" as const,
         updatedAt: Date.now(),
       });
     }
-    
+
     return { cleaned: staleUploads.length };
   },
 });
@@ -281,11 +281,11 @@ export const fixBrokenMediaUrls = mutation({
   args: {},
   handler: async (ctx) => {
     await requireAdminClerk(ctx, "media:fixBrokenMediaUrls");
-    
+
     // Find records with empty mediaUrl but valid uploadKey
     const brokenRecords = await ctx.db
       .query("media")
-      .filter((q) => 
+      .filter((q) =>
         q.and(
           q.or(
             q.eq(q.field("mediaUrl"), ""),
@@ -295,32 +295,32 @@ export const fixBrokenMediaUrls = mutation({
         )
       )
       .collect();
-    
+
     let fixedCount = 0;
-    
+
     for (const record of brokenRecords) {
       if (!record.uploadKey) continue;
-      
+
       // Check if uploadKey is a UUID (R2 generated key)
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(record.uploadKey);
-      
+
       if (isUUID) {
         // Construct the R2 URL using the custom domain
         const mediaUrl = `https://r2-realigna.7thw.co/${record.uploadKey}`;
-        
+
         await ctx.db.patch(record._id, {
           mediaUrl,
           uploadStatus: "completed" as const,
           updatedAt: Date.now(),
         });
-        
+
         fixedCount++;
         console.log(`✅ Fixed record ${record._id}: ${record.uploadKey} -> ${mediaUrl}`);
       }
     }
-    
-    return { 
-      totalBroken: brokenRecords.length, 
+
+    return {
+      totalBroken: brokenRecords.length,
       fixed: fixedCount,
       message: `Fixed ${fixedCount} out of ${brokenRecords.length} broken records`
     };

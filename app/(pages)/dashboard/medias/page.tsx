@@ -65,14 +65,8 @@ export default function MediasPage() {
       <SectionCards />
 
 
-      {mediaData && mediaData.length > 0 ? (
-        <DataTable data={mediaData} />
-      ) : (
-        <div className="p-8 text-center border border-dashed rounded-lg">
-          <p className="text-muted-foreground mb-2">No media files found</p>
-          <p className="text-sm text-muted-foreground">Upload your first media file to get started</p>
-        </div>
-      )}
+      {/* Always render the DataTable component, even when there are no media files */}
+      <DataTable data={mediaData || []} />
     </div>
   )
 }
