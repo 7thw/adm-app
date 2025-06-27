@@ -1,0 +1,9 @@
+/* Core Playlist Component Styles */
+
+/* Section styles */
+.section-card {
+  margin-bottom: 1.5rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  overflow: hidden;
+}

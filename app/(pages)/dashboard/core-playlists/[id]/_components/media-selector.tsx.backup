@@ -1,0 +1,152 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type * as CoreSections from "@/convex/coreSections";
+import type * as Media from "@/convex/media";
+import type * as CoreSectionMedia from "@/convex/coreSectionMedia";
+import { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
+import { Loader2, Search, Music, Video } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+
+interface MediaSelectorProps {
+  sectionId: Id<"coreSections">;
+  onSuccess: () => void;
+}
+
+export default function MediaSelector({ sectionId, onSuccess }: MediaSelectorProps) {
+  const allMedia = useQuery(api.media.getAllMedia, { limit: 100 });
+  const section = useQuery(api.coreSections.getById, { id: sectionId });
+  const sectionMedia = useQuery(api.coreSectionMedia.getBySectionId, { sectionId });
+  const addMedia = useMutation(api.coreSectionMedia.addMedia);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [addedMediaIds, setAddedMediaIds] = useState<Set<string>>(new Set());
+
+  // Update the set of added media IDs when sectionMedia changes
+  useEffect(() => {
+    if (sectionMedia) {
+      const mediaIds = new Set(sectionMedia.map(item => String(item.mediaId)));
+      setAddedMediaIds(mediaIds);
+    }
+  }, [sectionMedia]);
+
+  const handleAddMedia = async (mediaId: Id<"media">) => {
+    setIsLoading(true);
+    try {
+      await addMedia({
+        sectionId: sectionId,
+        mediaId,
+        isRequired: true, // Default to required
+      });
+      // Add to local state to avoid refetching
+      setAddedMediaIds(prev => new Set(prev).add(String(mediaId)));
+      toast.success("Media added to section");
+    } catch (error) {
+      toast.error("Failed to add media: " + (error instanceof Error ? error.message : String(error)));
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Filter media based on search query
+  const filteredMedia = allMedia?.filter((media) => {
+    return media.title.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  // Check if media is already in the section
+  const isMediaInSection = (mediaId: Id<"media">) => {
+    return addedMediaIds.has(mediaId.toString());
+  };
+
+  if (!allMedia || !section || !sectionMedia) {
+    return (
+      <div className="flex items-center justify-center h-32">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 py-4">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search media..."
+          className="pl-8"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      <ScrollArea className="h-[400px]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead className="w-[100px]">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredMedia && filteredMedia.length > 0 ? (
+              filteredMedia.map((media) => (
+                <TableRow key={media._id.toString()}>
+                  <TableCell className="font-medium">{media.title}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {media.mediaType === "audio" ? (
+                        <Music className="h-3 w-3 mr-1" />
+                      ) : (
+                        <Video className="h-3 w-3 mr-1" />
+                      )}
+                      {media.mediaType}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant={isMediaInSection(media._id) ? "secondary" : "default"}
+                      disabled={isMediaInSection(media._id) || isLoading}
+                      onClick={() => handleAddMedia(media._id)}
+                    >
+                      {isMediaInSection(media._id) ? "Added" : "Add"}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center py-4">
+                  No media found
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </ScrollArea>
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={onSuccess}>
+          Done
+        </Button>
+      </div>
+    </div>
+  );
+}

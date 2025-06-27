@@ -15,7 +15,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const titleMap: Record<string, string> = {
     "/dashboard": "Dashboard",
     "/dashboard/medias": "Medias",
-    "/dashboard/playlists": "Playlists",
+    "/dashboard/core-playlists": "Playlists",
     "/dashboard/plans": "Subscription Plans",
     "/dashboard/subscribers": "Subscribers",
   }

@@ -1,39 +1,33 @@
 "use client";
 
 import { api } from "@/convex/_generated/api";
-import { useMutation, useQuery } from "convex/react";
-import { Edit, Eye, List, Loader2, PlusCircle, Search, Trash2 } from "lucide-react";
+import { useQuery } from "convex/react";
+import { Edit, Link, List, Loader2, PlusCircle, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+
+// Inside your component
+const router = useRouter();
+
+// Add this function definition
+const handleCreatePlaylist = () => {
+  router.push("/dashboard/core-playlists/create");
+};
 
 export default function CorePlaylistsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [deletePlaylistId, setDeletePlaylistId] = useState<string | null>(null);
 
-  // Fetch core playlists from Convex
-  const playlists = useQuery(api.corePlaylists.getAll) || [];
+  // Fetch core playlists from Convex with proper typing
+  const playlists = useQuery(api.corePlaylists.getAll, {}) || [];
 
   // Get playlist categories to display category names
-  const categories = useQuery(api.playlistCategories.getAllActive) || [];
-
-  // Delete mutation
-  const deletePlaylist = useMutation(api.corePlaylists.remove);
+  const categories = useQuery(api.playlistCategories.getAll, {}) || [];
 
   // Loading state based on Convex query
   const isLoading = playlists === undefined;
@@ -45,25 +39,13 @@ export default function CorePlaylistsPage() {
   };
 
   // Filter playlists based on search query
-  const filteredPlaylists = playlists.filter(playlist =>
-    playlist.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (playlist.description && playlist.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (getCategoryName(playlist.categoryId).toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredPlaylists = playlists.filter(playlist => {
+    const titleMatch = playlist.title?.toLowerCase().includes(searchQuery.toLowerCase()) || false;
+    const descriptionMatch = playlist.description?.toLowerCase().includes(searchQuery.toLowerCase()) || false;
+    const categoryMatch = getCategoryName(playlist.categoryId).toLowerCase().includes(searchQuery.toLowerCase());
 
-  // Handle playlist deletion
-  const handleDeletePlaylist = async () => {
-    if (!deletePlaylistId) return;
-
-    try {
-      await deletePlaylist({ id: deletePlaylistId as any });
-      toast.success("Playlist deleted successfully");
-      setDeletePlaylistId(null);
-    } catch (error) {
-      console.error("Error deleting playlist:", error);
-      toast.error("Failed to delete playlist");
-    }
-  };
+    return titleMatch || descriptionMatch || categoryMatch;
+  });
 
   return (
     <div className="container mx-auto py-6">
@@ -72,7 +54,7 @@ export default function CorePlaylistsPage() {
           <h1 className="text-3xl font-bold">Core Playlists</h1>
           <p className="text-muted-foreground">Manage your master playlists for subscribers</p>
         </div>
-        <Button onClick={() => router.push("/dashboard/core-playlists/new")}>
+        <Button onClick={handleCreatePlaylist}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Create Playlist
         </Button>
@@ -103,63 +85,47 @@ export default function CorePlaylistsPage() {
                     <List className="mr-2 h-5 w-5 text-primary" />
                     {playlist.title}
                   </CardTitle>
-                  <Badge variant={playlist.status === "published" ? "default" : "outline"}>
-                    {playlist.status === "published" ? "Published" : "Draft"}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={playlist.status === "published" ? "default" : "outline"}>
+                      {playlist.status === "published" ? "Published" : "Draft"}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      Category: {getCategoryName(playlist.categoryId || "")}
+                    </span>
+                  </div>
                 </div>
-                <CardDescription>{playlist.description || "No description"}</CardDescription>
+                <CardDescription>{playlist.description}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col gap-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Category</span>
-                    <span className="font-medium">{getCategoryName(playlist.categoryId)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Play Count</span>
-                    <span className="font-medium">{playlist.playCount}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Created</span>
-                    <span className="font-medium">
-                      {new Date(playlist.createdAt).toLocaleDateString()}
-                    </span>
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between text-sm">
+                    <div>Category</div>
+                    <div className="font-medium">{getCategoryName(playlist.categoryId)}</div>
                   </div>
                 </div>
               </CardContent>
               <CardFooter className="flex">
-                <div className="flex w-full justify-between gap-2">
+                <div className="flex w-full justify-between">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => router.push(`/dashboard/core-playlists/${playlist._id}`)}
+                    onClick={() => router.push(`/dashboard/core-playlists/${playlist._id}/preview`)}
                     className="gap-2"
                   >
-                    <Eye className="h-4 w-4" />
-                    View
+                    <Link className="h-4 w-4" />
+                    Mobile Preview
                   </Button>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => router.push(`/dashboard/core-playlists/${playlist._id}/edit`)}
-                      className="gap-2"
-                      disabled={playlist.status === "published"}
-                    >
-                      <Edit className="h-4 w-4" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => setDeletePlaylistId(playlist._id)}
-                      className="gap-2"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </Button>
-                  </div>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => router.push(`/dashboard/core-playlists/${playlist._id}/edit`)}
+                    className="gap-2"
+                  >
+                    <Edit className="h-4 w-4" />
+                    Edit Playlist
+                  </Button>
                 </div>
+
               </CardFooter>
             </Card>
           ))}
@@ -177,36 +143,8 @@ export default function CorePlaylistsPage() {
               ? "Try adjusting your search query."
               : "Get started by creating a new playlist."}
           </p>
-          {!searchQuery && (
-            <Button
-              className="mt-4"
-              onClick={() => router.push("/dashboard/core-playlists/new")}
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Create Your First Playlist
-            </Button>
-          )}
         </div>
       )}
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={!!deletePlaylistId} onOpenChange={() => setDeletePlaylistId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Are you sure?</DialogTitle>
-            <DialogDescription>
-              This action cannot be undone. This will permanently delete the playlist
-              and all its sections and media associations.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose>Cancel</DialogClose>
-            <DialogClose onClick={handleDeletePlaylist} className="bg-destructive text-destructive-foreground">
-              Delete Playlist
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

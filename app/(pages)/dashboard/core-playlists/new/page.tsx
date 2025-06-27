@@ -1,60 +1,39 @@
-"use client";
+"use client"
 
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Save } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlaylistForm } from "../_components/playlist-form";
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { ArrowLeftIcon } from "lucide-react"
 
-export default function NewPlaylistPage() {
-  const router = useRouter();
+import { Button } from "@/components/ui/button"
+import { PlaylistForm } from "../_components/playlist-form"
+import { Id } from "@/convex/_generated/dataModel"
 
-  const handleSuccess = (playlistId: string) => {
-    router.push(`/dashboard/core-playlists/${playlistId}`);
-  };
-
-  const handleCancel = () => {
-    router.back();
-  };
-
+export default function NewCorePlaylistPage() {
+  const router = useRouter()
+  
+  const handleSuccess = (playlistId: Id<"corePlaylists">) => {
+    // Redirect to the edit page immediately after successful creation
+    router.push(`/dashboard/core-playlists/${playlistId}/edit`)
+  }
+  
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.back()}
-          className="gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Create New Playlist</h1>
-          <p className="text-muted-foreground">
-            Create a new core playlist that subscribers can customize
-          </p>
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard/core-playlists">
+            <Button variant="outline" size="icon">
+              <ArrowLeftIcon className="h-4 w-4" />
+              <span className="sr-only">Back</span>
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold">Create New Core Playlist</h1>
         </div>
       </div>
-
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Save className="h-5 w-5" />
-            Playlist Details
-          </CardTitle>
-          <CardDescription>
-            Enter the basic information for your new playlist. You can add sections and media after creation.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PlaylistForm
-            onSuccess={handleSuccess}
-            onCancel={handleCancel}
-            submitLabel="Create Playlist"
-          />
-        </CardContent>
-      </Card>
+      
+      <PlaylistForm 
+        onSuccess={handleSuccess} 
+        submitLabel="Create Playlist"
+      />
     </div>
-  );
+  )
 }

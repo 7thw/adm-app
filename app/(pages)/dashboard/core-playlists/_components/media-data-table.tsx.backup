@@ -1,0 +1,535 @@
+"use client"
+
+import * as React from "react"
+import {
+    DndContext,
+    KeyboardSensor,
+    MouseSensor,
+    TouchSensor,
+    closestCenter,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+    type UniqueIdentifier,
+} from "@dnd-kit/core"
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
+import {
+    SortableContext,
+    arrayMove,
+    useSortable,
+    verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import {
+    ColumnDef,
+    ColumnFiltersState,
+    Row,
+    SortingState,
+    VisibilityState,
+    flexRender,
+    getCoreRowModel,
+    getFacetedRowModel,
+    getFacetedUniqueValues,
+    getFilteredRowModel,
+    getPaginationRowModel,
+    getSortedRowModel,
+    useReactTable,
+} from "@tanstack/react-table"
+import {
+    CheckCircle2,
+    ChevronDownIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    ChevronsLeftIcon,
+    ChevronsRightIcon,
+    Clock,
+    ColumnsIcon,
+    GripVerticalIcon,
+    MoreVerticalIcon,
+    PlusIcon,
+    Search,
+} from "lucide-react"
+import { toast } from "sonner"
+import { useMutation } from "convex/react"
+
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table"
+import { api } from "@/convex/_generated/api"
+import type { Doc, Id } from "@/convex/_generated/dataModel"
+
+// Use the actual Convex Doc type for media
+type MediaData = Doc<"media"> & {
+  // Add missing properties needed for the component
+  selected?: boolean;
+  duration?: number;
+  url?: string;
+}
+
+interface MediaDataTableProps<TData extends MediaData> {
+    data: TData[]
+    sectionId: Id<"coreSections">
+    maxSelectMedia: number
+    columns?: ColumnDef<TData>[]
+    onReorder?: (newOrder: TData[]) => Promise<void>
+    onAddMedia?: () => void
+    onToggleSelection?: (mediaId: Id<"media">, selected: boolean) => Promise<void>
+}
+
+// Create a separate component for the drag handle
+function DragHandle({ id }: { id: Id<"media"> }) {
+    const { attributes, listeners } = useSortable({
+        id: id.toString(),
+    })
+
+    return (
+        <Button
+            {...attributes}
+            {...listeners}
+            variant="ghost"
+            size="icon"
+            className="size-7 text-muted-foreground hover:bg-transparent"
+        >
+            <GripVerticalIcon className="size-3 text-muted-foreground" />
+            <span className="sr-only">Drag to reorder</span>
+        </Button>
+    )
+}
+
+// Format duration from seconds to MM:SS
+function formatDuration(seconds: number) {
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+}
+
+function DraggableRow<TData extends MediaData>({
+    row,
+    onToggleSelection,
+    maxSelectMedia,
+    selectedCount,
+}: {
+    row: Row<TData>
+    onToggleSelection?: (mediaId: Id<"media">, selected: boolean) => Promise<void>
+    maxSelectMedia: number
+    selectedCount: number
+}) {
+    const { transform, transition, setNodeRef, isDragging } = useSortable({
+        id: row.original._id.toString(),
+    })
+
+    const isSelected = row.original.selected || false
+    const disableSelection = !isSelected && selectedCount >= maxSelectMedia
+
+    const handleToggleSelection = async () => {
+        if (disableSelection) {
+            toast.error(`Cannot select more than ${maxSelectMedia} media items`)
+            return
+        }
+
+        if (onToggleSelection) {
+            try {
+                await onToggleSelection(row.original._id, !isSelected)
+            } catch (error) {
+                console.error("Error toggling selection:", error)
+                toast.error("Failed to update selection")
+            }
+        }
+    }
+
+    return (
+        <TableRow
+            data-state={row.getIsSelected() && "selected"}
+            data-dragging={isDragging}
+            ref={setNodeRef}
+            className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
+            style={{
+                transform: CSS.Transform.toString(transform),
+                transition: transition,
+            }}
+        >
+            {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+            ))}
+        </TableRow>
+    )
+}
+
+export function MediaDataTable<TData extends MediaData>({
+    data: initialData,
+    sectionId,
+    maxSelectMedia,
+    columns: customColumns,
+    onReorder,
+    onAddMedia,
+    onToggleSelection,
+}: MediaDataTableProps<TData>) {
+    const [data, setData] = React.useState(() => initialData)
+    const [rowSelection, setRowSelection] = React.useState({})
+    const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+    const [sorting, setSorting] = React.useState<SortingState>([])
+    const [searchQuery, setSearchQuery] = React.useState("")
+
+    // TODO: Add these mutations to the media API
+    // For now, we'll just show UI without actual mutations
+    // const updateMedia = useMutation(api.media.update)
+    // const deleteMedia = useMutation(api.media.remove)
+    // const reorderMedia = useMutation(api.media.reorder)
+
+    const sortableId = React.useId()
+    const sensors = useSensors(
+        useSensor(MouseSensor, {}),
+        useSensor(TouchSensor, {}),
+        useSensor(KeyboardSensor, {})
+    )
+
+    // Update local data when props change
+    React.useEffect(() => {
+        setData(initialData)
+    }, [initialData])
+
+    // Apply search filter
+    React.useEffect(() => {
+        if (!searchQuery) {
+            setData(initialData)
+            return
+        }
+
+        const filtered = initialData.filter(item => 
+            item.title.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+        setData(filtered)
+    }, [searchQuery, initialData])
+
+    const dataIds = React.useMemo<UniqueIdentifier[]>(
+        () => data?.map(({ _id }) => _id.toString()) || [],
+        [data]
+    )
+
+    // Count selected media items
+    const selectedCount = React.useMemo(() => 
+        data.filter(item => item.selected).length,
+        [data]
+    )
+
+    // Default columns if none provided
+    const defaultColumns: ColumnDef<TData>[] = [
+        {
+            id: "drag",
+            header: () => null,
+            cell: ({ row }) => <DragHandle id={row.original._id} />,
+            size: 40,
+        },
+        {
+            id: "select",
+            header: () => null,
+            cell: ({ row }) => {
+                const isSelected = row.original.selected || false
+                const disableSelection = !isSelected && selectedCount >= maxSelectMedia
+                
+                return (
+                    <div className="flex items-center justify-center">
+                        <Checkbox
+                            checked={isSelected}
+                            disabled={disableSelection}
+                            onCheckedChange={() => {
+                                if (onToggleSelection) {
+                                    onToggleSelection(row.original._id, !isSelected)
+                                }
+                            }}
+                            aria-label={`Select ${row.original.title}`}
+                        />
+                    </div>
+                )
+            },
+            size: 40,
+            enableSorting: false,
+            enableHiding: false,
+        },
+        {
+            accessorKey: "title",
+            header: "Title",
+            cell: ({ row }) => (
+                <div className="font-medium">
+                    {row.original.title}
+                </div>
+            ),
+            enableHiding: false,
+        },
+        {
+            accessorKey: "duration",
+            header: "Duration",
+            cell: ({ row }) => (
+                <div className="flex items-center">
+                    <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
+                    {formatDuration(row.original.duration || 0)}
+                </div>
+            ),
+        },
+        {
+            id: "status",
+            header: "Status",
+            cell: ({ row }) => {
+                const isSelected = row.original.selected || false
+                return (
+                    <div className="flex items-center">
+                        {isSelected ? (
+                            <Badge variant="default" className="flex items-center gap-1 bg-green-500">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Selected
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline">Not Selected</Badge>
+                        )}
+                    </div>
+                )
+            },
+        },
+        {
+            id: "actions",
+            header: "Actions",
+            cell: ({ row }) => {
+                const media = row.original
+                return (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                className="flex size-8 text-muted-foreground data-[state=open]:bg-muted"
+                                size="icon"
+                            >
+                                <MoreVerticalIcon className="h-4 w-4" />
+                                <span className="sr-only">Open menu</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-32">
+                            <DropdownMenuItem 
+                                onClick={() => onToggleSelection?.(media._id, !media.selected)}
+                            >
+                                {media.selected ? "Deselect" : "Select"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePreview(media)}>
+                                Preview
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onClick={() => handleRemove(media)}
+                                className="text-destructive"
+                            >
+                                Remove
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )
+            },
+        },
+    ]
+
+    const columns = customColumns || defaultColumns
+
+    const table = useReactTable({
+        data,
+        columns,
+        state: {
+            sorting,
+            columnVisibility,
+            rowSelection,
+            columnFilters,
+        },
+        getRowId: (row) => row._id.toString(),
+        enableRowSelection: true,
+        onRowSelectionChange: setRowSelection,
+        onSortingChange: setSorting,
+        onColumnFiltersChange: setColumnFilters,
+        onColumnVisibilityChange: setColumnVisibility,
+        getCoreRowModel: getCoreRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        getFacetedRowModel: getFacetedRowModel(),
+        getFacetedUniqueValues: getFacetedUniqueValues(),
+    })
+
+    const handleDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event
+        if (active && over && active.id !== over.id) {
+            const oldIndex = dataIds.indexOf(active.id)
+            const newIndex = dataIds.indexOf(over.id)
+            const newData = arrayMove(data, oldIndex, newIndex)
+
+            setData(newData)
+
+            // Call the onReorder callback if provided
+            if (onReorder) {
+                try {
+                    await onReorder(newData)
+                    toast.success("Media items reordered successfully")
+                } catch (error) {
+                    console.error("Error reordering media items:", error)
+                    toast.error("Failed to reorder media items")
+                    // Revert the change on error
+                    setData(data)
+                }
+            } else {
+                // TODO: Implement reordering when API is available
+                // For now, just show success toast
+                toast.success("Media items reordered successfully")
+                // In a real implementation, we would call the API:
+                // try {
+                //     await reorderMedia({
+                //         sectionId,
+                //         mediaIds: newData.map(item => item._id) as Id<"media">[],
+                //     })
+                //     toast.success("Media items reordered successfully")
+                // } catch (error) {
+                //     console.error("Error reordering media items:", error)
+                //     toast.error("Failed to reorder media items")
+                //     setData(data)
+                // }
+            }
+        }
+    }
+
+    const handlePreview = (media: TData) => {
+        // Open a preview modal or navigate to preview page
+        window.open(media.url, '_blank')
+    }
+
+    const handleRemove = async (media: TData) => {
+        if (!window.confirm("Are you sure you want to remove this media item from the section?")) {
+            return
+        }
+
+        // TODO: Implement media removal when API is available
+        // For now, just show success toast
+        toast.success("Media removed from section")
+        
+        // In a real implementation, we would call the API:
+        // try {
+        //     // This would remove the media from the section, not delete the media itself
+        //     await deleteMedia({ 
+        //         id: media._id,
+        //         sectionId 
+        //     })
+        //     toast.success("Media removed from section")
+        // } catch (error) {
+        //     console.error("Error removing media:", error)
+        //     toast.error("Failed to remove media")
+        // }
+    }
+
+    const handleAddMediaClick = () => {
+        if (onAddMedia) {
+            onAddMedia()
+        }
+    }
+
+    return (
+        <div className="flex w-full flex-col justify-start gap-4">
+            <div className="flex items-center justify-between">
+                <div className="relative w-64">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search media..."
+                        className="pl-8"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <div className="text-sm text-muted-foreground">
+                        {selectedCount} of {maxSelectMedia} selected
+                    </div>
+                    <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleAddMediaClick}
+                    >
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Add Media
+                    </Button>
+                </div>
+            </div>
+
+            <div className="overflow-hidden rounded-lg border">
+                <DndContext
+                    collisionDetection={closestCenter}
+                    modifiers={[restrictToVerticalAxis]}
+                    onDragEnd={handleDragEnd}
+                    sensors={sensors}
+                    id={sortableId}
+                >
+                    <Table>
+                        <TableHeader className="sticky top-0 z-10 bg-muted">
+                            {table.getHeaderGroups().map((headerGroup) => (
+                                <TableRow key={headerGroup.id}>
+                                    {headerGroup.headers.map((header) => {
+                                        return (
+                                            <TableHead key={header.id} colSpan={header.colSpan}>
+                                                {header.isPlaceholder
+                                                    ? null
+                                                    : flexRender(
+                                                        header.column.columnDef.header,
+                                                        header.getContext()
+                                                    )}
+                                            </TableHead>
+                                        )
+                                    })}
+                                </TableRow>
+                            ))}
+                        </TableHeader>
+                        <TableBody>
+                            {table.getRowModel().rows?.length ? (
+                                <SortableContext
+                                    items={dataIds}
+                                    strategy={verticalListSortingStrategy}
+                                >
+                                    {table.getRowModel().rows.map((row) => (
+                                        <DraggableRow
+                                            key={row.id}
+                                            row={row}
+                                            onToggleSelection={onToggleSelection}
+                                            maxSelectMedia={maxSelectMedia}
+                                            selectedCount={selectedCount}
+                                        />
+                                    ))}
+                                </SortableContext>
+                            ) : (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={columns.length}
+                                        className="h-24 text-center"
+                                    >
+                                        No media items found.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </DndContext>
+            </div>
+        </div>
+    )
+}

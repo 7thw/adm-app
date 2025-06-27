@@ -1,0 +1,262 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type * as CoreSections from "@/convex/coreSections";
+import type * as CoreSectionMedia from "@/convex/coreSectionMedia";
+import type * as CorePlaylists from "@/convex/corePlaylists";
+import { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
+import { Loader2, Edit, Plus } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+import { DataTable } from "../../_components/data-table";
+import EditSectionForm from "./edit-section-form";
+import MediaSelector from "./media-selector";
+import MediaList from "./media-list";
+import { MediaDataTable } from "../../_components/media-data-table";
+
+interface CoreSectionsListProps {
+  corePlaylistId: Id<"corePlaylists">;
+}
+
+export default function CoreSectionsList({ corePlaylistId }: CoreSectionsListProps) {
+  const sections = useQuery(api.coreSections.getByCorePlaylistId, { playlistId: corePlaylistId });
+  const reorderSections = useMutation(api.coreSections.reorder);
+  const deleteSection = useMutation(api.coreSections.remove);
+  // TODO: Add duplicate function to coreSections API
+  // const duplicateSection = useMutation(api.coreSections.duplicate);
+
+  const [editingSectionId, setEditingSectionId] = useState<Id<"coreSections"> | null>(null);
+  const [addingMediaToSectionId, setAddingMediaToSectionId] = useState<Id<"coreSections"> | null>(null);
+  const [viewingMediaSectionId, setViewingMediaSectionId] = useState<Id<"coreSections"> | null>(null);
+  const [selectedSection, setSelectedSection] = useState<any>(null);
+  const [sectionMedia, setSectionMedia] = useState<any[]>([]);
+
+  // Get media for the selected section
+  const sectionMediaData = useQuery(
+    api.coreSectionMedia.getBySectionId,
+    viewingMediaSectionId ? { sectionId: viewingMediaSectionId } : "skip"
+  );
+
+  // Convex mutations for media operations
+  const reorderSectionMedia = useMutation(api.coreSectionMedia.reorderMedia);
+  const updateMediaSelection = useMutation(api.coreSectionMedia.updateSelection);
+
+  // Update sectionMedia when data changes
+  useEffect(() => {
+    if (sectionMediaData) {
+      // Transform the data to match what MediaDataTable expects
+      const mediaItems = sectionMediaData.map(item => ({
+        ...item,
+        _id: item.mediaId,
+        selected: item.isRequired,
+        sectionMediaId: item._id // Store the junction table ID for operations
+      })).filter(item => item._id); // Filter out any items with missing _id
+      setSectionMedia(mediaItems);
+    }
+  }, [sectionMediaData]);
+
+  const handleReorderSections = async (newSections: any[]) => {
+    const sectionOrders = newSections.map((section, index) => ({
+      id: section._id,
+      order: index + 1,
+    }));
+
+    try {
+      await reorderSections({ sectionOrders });
+      // Return void instead of boolean to match expected type
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleDeleteSection = async (section: any) => {
+    if (!confirm("Are you sure you want to delete this section?")) {
+      return;
+    }
+
+    try {
+      await deleteSection({ id: section._id });
+      toast.success("Section deleted successfully");
+    } catch (error) {
+      toast.error("Failed to delete section");
+      console.error(error);
+    }
+  };
+
+  const handleDuplicateSection = async (section: any) => {
+    try {
+      // TODO: Implement section duplication when API is available
+      // await duplicateSection({ id: section._id });
+      toast.success("Section duplicated successfully");
+    } catch (error) {
+      toast.error("Failed to duplicate section");
+      console.error(error);
+    }
+  };
+
+  const handleEditSection = (section: any) => {
+    setEditingSectionId(section._id);
+  };
+
+  const handleAddMedia = (section: any) => {
+    setAddingMediaToSectionId(section._id);
+  };
+
+  const handleViewMedia = (section: any) => {
+    setViewingMediaSectionId(section._id);
+    setSelectedSection(section);
+  };
+
+  // Handle reordering media within a section
+  const handleReorderMedia = async (newMediaOrder: any[]) => {
+    if (!viewingMediaSectionId) return;
+
+    try {
+      // Format the data for the API
+      const mediaOrders = newMediaOrder.map((media, index) => ({
+        id: media.sectionMediaId, // Use the junction table ID
+        order: index + 1
+      }));
+
+      await reorderSectionMedia({
+        mediaOrders
+      });
+
+      toast.success("Media order updated");
+    } catch (error) {
+      toast.error("Failed to update media order");
+      console.error(error);
+    }
+  };
+
+  // Handle toggling media selection
+  const handleToggleMediaSelection = async (mediaId: Id<"media">, selected: boolean) => {
+    // Find the sectionMediaId for this media
+    const mediaItem = sectionMedia.find(item => item._id === mediaId);
+    if (!mediaItem?.sectionMediaId) return;
+
+    try {
+      await updateMediaSelection({
+        id: mediaItem.sectionMediaId,
+        isRequired: selected
+      });
+
+      // Update local state
+      setSectionMedia(prev =>
+        prev.map(item =>
+          item._id === mediaId ? { ...item, selected } : item
+        )
+      );
+
+      toast.success(selected ? "Media selected" : "Media unselected");
+    } catch (error) {
+      toast.error("Failed to update selection");
+      console.error(error);
+    }
+  };
+
+  const handleAddSection = () => {
+    // Navigate to add section form or open modal
+    // This is handled by the DataTable component's Add Section button
+  };
+
+  if (!sections) {
+    return (
+      <div className="flex items-center justify-center h-32">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (sections.length === 0) {
+    return (
+      <div className="text-center py-8 border border-dashed rounded-lg">
+        <p className="text-muted-foreground mb-4">No sections added yet</p>
+        <Button onClick={handleAddSection}>
+          <Plus className="mr-2 h-4 w-4" /> Add Section
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Sections DataTable */}
+      <Card>
+        <CardContent className="p-6">
+          <DataTable
+            data={sections}
+            onReorder={handleReorderSections}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Edit Section Dialog */}
+      <Dialog open={!!editingSectionId} onOpenChange={() => setEditingSectionId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Section</DialogTitle>
+          </DialogHeader>
+          {editingSectionId && (
+            <EditSectionForm
+              sectionId={editingSectionId}
+              onSuccess={() => setEditingSectionId(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Media Dialog */}
+      <Dialog open={!!addingMediaToSectionId} onOpenChange={() => setAddingMediaToSectionId(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Media to Section</DialogTitle>
+          </DialogHeader>
+          {addingMediaToSectionId && (
+            <MediaSelector
+              sectionId={addingMediaToSectionId}
+              onSuccess={() => setAddingMediaToSectionId(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* View Media Dialog */}
+      <Dialog
+        open={!!viewingMediaSectionId}
+        onOpenChange={() => setViewingMediaSectionId(null)}
+      >
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedSection?.title} - Media
+            </DialogTitle>
+          </DialogHeader>
+          {viewingMediaSectionId && selectedSection && (
+            <div className="py-4">
+              <MediaDataTable
+                data={sectionMedia}
+                sectionId={viewingMediaSectionId}
+                maxSelectMedia={selectedSection.maxSelectMedia || 5}
+                onReorder={handleReorderMedia}
+                onAddMedia={() => setAddingMediaToSectionId(viewingMediaSectionId)}
+                onToggleSelection={handleToggleMediaSelection}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

@@ -48,7 +48,7 @@ const data = {
     },
     {
       title: "Playlists",
-      url: "/dashboard/playlists", // Playlists page
+      url: "/dashboard/core-playlists", // Playlists page
       icon: IconChartBar,
     }
   ],
