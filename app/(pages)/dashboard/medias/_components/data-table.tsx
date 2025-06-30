@@ -1,6 +1,5 @@
 "use client"
 
-import { api } from "@/convex/_generated/api"
 import { type UniqueIdentifier } from "@dnd-kit/core"
 import {
   IconChevronDown,
@@ -8,7 +7,6 @@ import {
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconDotsVertical,
   IconLayoutColumns,
   IconPlayerPlayFilled,
   IconPlus,
@@ -29,10 +27,9 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { useMutation } from "convex/react"
 import * as React from "react"
 import { toast } from "sonner"
-import { z } from "zod"
+import { Doc } from "@/convex/_generated/dataModel"
 
 import MediaPlayer from "@/components/medias/MediaPlayer"
 import MediaInfo from "@/components/medias/media-info"
@@ -64,8 +61,6 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -93,32 +88,11 @@ import {
 } from "@/components/ui/tabs"
 import FormMedia from "./FormMedia"
 
-export const schema = z.object({
-  _id: z.any(), // Convex ID
-  title: z.string(),
-  description: z.string().optional(),
-  mediaType: z.enum(["audio", "video"]), // Constrained to exact schema options
-  storageId: z.string().optional(), // Convex _storage ID
-  embedUrl: z.string().optional(), // For video embeds
-  youtubeId: z.string().optional(), // For YouTube videos
-  duration: z.number(), // in seconds
-  fileSize: z.number().optional(),
-  contentType: z.string().optional(),
-  thumbnailStorageId: z.string().optional(),
-  thumbnailUrl: z.string().optional(),
-  processingStatus: z.enum(["pending", "processing", "completed", "failed"]).optional(),
-  transcript: z.string().optional(),
-  waveformData: z.string().optional(),
-  quality: z.string().optional(),
-  bitrate: z.number().optional(),
-  uploadedBy: z.string(), // User ID
-  isPublic: z.boolean().optional(),
-  _creationTime: z.number().optional(),
-})
-
+// Use the Convex-generated Doc type instead of Zod schema
+// This ensures single source of truth from the database schema
 // Drag functionality has been removed
 
-export const columns: ColumnDef<z.infer<typeof schema>>[] = [
+export const columns: ColumnDef<Doc<"medias">>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -264,9 +238,9 @@ export const columns: ColumnDef<z.infer<typeof schema>>[] = [
       return (
         <Dialog open={openPlayer && isClient} onOpenChange={setOpenPlayer}>
           <DialogTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={openMediaPlayer}
               className="text-muted-foreground hover:text-primary"
               title={`Play ${media.title}`}
@@ -332,7 +306,7 @@ export const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
 ]
 
-function DataTableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
+function DataTableRow({ row }: { row: Row<Doc<"medias">> }) {
   return (
     <TableRow data-state={row.getIsSelected() && "selected"}>
       {row.getVisibleCells().map((cell) => (
@@ -347,11 +321,11 @@ function DataTableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
 export function DataTable({
   data: initialData,
 }: {
-  data: z.infer<typeof schema>[]
+  data: Doc<"medias">[]
 }) {
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [activeFilter, setActiveFilter] = React.useState<"all" | "audio" | "video">("all")
-  const [data, setData] = React.useState<z.infer<typeof schema>[]>(initialData)
+  const [data, setData] = React.useState<Doc<"medias">[]>(initialData)
   // TODO: Implement deleteMedia function in Convex backend
   // const deleteMediaMutation = useMutation(api.admin.deleteMedia);
 
@@ -429,8 +403,8 @@ export function DataTable({
         <Label htmlFor="view-selector" className="sr-only">
           View
         </Label>
-        <Select 
-          defaultValue="all" 
+        <Select
+          defaultValue="all"
           value={activeFilter}
           onValueChange={(value: "all" | "audio" | "video") => {
             setActiveFilter(value);
@@ -451,7 +425,7 @@ export function DataTable({
             <SelectItem value="video">Video</SelectItem>
           </SelectContent>
         </Select>
-        <TabsList 
+        <TabsList
           className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex"
         >
           <TabsTrigger value="all">All</TabsTrigger>
@@ -909,7 +883,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
+function TableCellViewer({ item }: { item: Doc<"medias"> }) {
   return (
     <Drawer>
       <DrawerTrigger asChild>

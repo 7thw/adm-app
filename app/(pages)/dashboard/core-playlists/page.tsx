@@ -17,10 +17,10 @@ export default function CorePlaylistsPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch core playlists from Convex with proper typing
-  const playlists = useQuery(api.corePlaylists.getAll, {}) || [];
+  const playlists = useQuery(api.admin.listCorePlaylists, {}) || [];
 
   // Get categories to display category names
-  const categories = useQuery(api.coreCategories.getAll, {}) || [];
+  const categories = useQuery(api.admin.listCoreCategories, {}) || [];
 
   // Loading state based on Convex query
   const isLoading = playlists === undefined;
@@ -40,7 +40,7 @@ export default function CorePlaylistsPage() {
 
     return titleMatch || descriptionMatch || categoryMatch;
   });
-  
+
   // Handler for creating new playlist
   const handleCreatePlaylist = () => {
     router.push("/dashboard/core-playlists/new");
@@ -76,7 +76,7 @@ export default function CorePlaylistsPage() {
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredPlaylists.map((playlist) => (
+          {filteredPlaylists.map((playlist: Doc<"corePlaylists">) => (
             <Card key={playlist._id.toString()} className="hover:shadow-md transition-shadow">
               <CardHeader>
                 <div className="flex items-center justify-between">

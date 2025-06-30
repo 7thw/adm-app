@@ -1,6 +1,5 @@
 "use client"
 
-import * as React from "react"
 import {
   DndContext,
   KeyboardSensor,
@@ -48,8 +47,10 @@ import {
   MoreVerticalIcon,
   PlusIcon,
 } from "lucide-react"
+import * as React from "react"
 import { toast } from "sonner"
-import { z } from "zod"
+import { Doc } from "@/convex/_generated/dataModel"
+import { Id } from "@/convex/_generated/dataModel"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -71,7 +72,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
   SheetClose,
@@ -105,30 +105,32 @@ type ChartConfig = {
   };
 }
 
-export const schema = z.object({
-  id: z.number(),
-  header: z.string(),
-  type: z.string(),
-  status: z.string(),
-  target: z.string(),
-  limit: z.string(),
-  reviewer: z.string(),
-})
+// Use the Convex-generated Doc type instead of Zod schema
+// This ensures single source of truth from the database schema
+
+// Field mapping from old schema to Convex schema
+// id -> _id
+// header -> title
+// type -> sectionType
+// status -> isRequired (boolean)
+// target -> minSelectMedia
+// limit -> maxSelectMedia
+// reviewer -> playlistId (reference)
 
 // No chart data needed for the simplified TableCellViewer
 
 // TableCellViewer component for displaying item details in a sheet
-function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
+function TableCellViewer({ item }: { item: Doc<"coreSections"> }) {
   return (
     <Sheet>
       <SheetTrigger asChild>
         <Button variant="link" className="w-fit px-0 text-left text-foreground">
-          {item.header}
+          {item.title}
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="flex flex-col">
         <SheetHeader className="gap-1">
-          <SheetTitle>{item.header}</SheetTitle>
+          <SheetTitle>{item.title}</SheetTitle>
           <SheetDescription>
             Edit section details
           </SheetDescription>
@@ -137,12 +139,12 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
           <form className="flex flex-col gap-4">
             <div className="flex flex-col gap-3">
               <Label htmlFor="header">Header</Label>
-              <Input id="header" defaultValue={item.header} />
+              <Input id="header" defaultValue={item.title} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-3">
                 <Label htmlFor="type">Type</Label>
-                <Select defaultValue={item.type}>
+                <Select defaultValue={item.sectionType}>
                   <SelectTrigger id="type" className="w-full">
                     <SelectValue placeholder="Select a type" />
                   </SelectTrigger>
@@ -168,7 +170,7 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
               </div>
               <div className="flex flex-col gap-3">
                 <Label htmlFor="status">Status</Label>
-                <Select defaultValue={item.status}>
+                <Select defaultValue={item.isRequired ? "Required" : "Optional"}>
                   <SelectTrigger id="status" className="w-full">
                     <SelectValue placeholder="Select a status" />
                   </SelectTrigger>
@@ -183,16 +185,16 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-3">
                 <Label htmlFor="target">Target</Label>
-                <Input id="target" defaultValue={item.target} />
+                <Input id="target" defaultValue={String(item.minSelectMedia)} />
               </div>
               <div className="flex flex-col gap-3">
                 <Label htmlFor="limit">Limit</Label>
-                <Input id="limit" defaultValue={item.limit} />
+                <Input id="limit" defaultValue={String(item.maxSelectMedia)} />
               </div>
             </div>
             <div className="flex flex-col gap-3">
               <Label htmlFor="reviewer">Reviewer</Label>
-              <Select defaultValue={item.reviewer}>
+              <Select defaultValue={String(item.playlistId)}>
                 <SelectTrigger id="reviewer" className="w-full">
                   <SelectValue placeholder="Select a reviewer" />
                 </SelectTrigger>
@@ -221,7 +223,7 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
 }
 
 // Create a separate component for the drag handle
-function DragHandle({ id }: { id: number }) {
+function DragHandle({ id }: { id: Id<"coreSections"> }) {
   const { attributes, listeners } = useSortable({
     id,
   })
@@ -240,11 +242,11 @@ function DragHandle({ id }: { id: number }) {
   )
 }
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
+const columns: ColumnDef<Doc<"coreSections">>[] = [
   {
     id: "drag",
     header: () => null,
-    cell: ({ row }) => <DragHandle id={row.original.id} />,
+    cell: ({ row }) => <DragHandle id={row.original._id} />,
   },
   {
     id: "select",
@@ -273,114 +275,116 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "header",
+    accessorKey: "title",
     header: "Header",
     cell: ({ row }) => {
       return (
         <div className="font-medium">
-          {row.original.header}
+          {row.original.title}
         </div>
       )
     },
     enableHiding: false,
   },
   {
-    accessorKey: "type",
+    accessorKey: "sectionType",
     header: "Section Type",
     cell: ({ row }) => (
       <div className="w-32">
         <Badge variant="outline" className="px-1.5 text-muted-foreground">
-          {row.original.type}
+          {row.original.sectionType}
         </Badge>
       </div>
     ),
   },
   {
-    accessorKey: "status",
+    accessorKey: "isRequired",
     header: "Status",
     cell: ({ row }) => (
       <Badge
         variant="outline"
         className="flex gap-1 px-1.5 text-muted-foreground [&_svg]:size-3"
       >
-        {row.original.status === "Done" ? (
+        {row.original.isRequired ? (
           <CheckCircle2Icon className="text-green-500 dark:text-green-400" />
         ) : (
           <LoaderIcon />
         )}
-        {row.original.status}
+        {row.original.isRequired ? "Required" : "Optional"}
       </Badge>
     ),
   },
   {
-    accessorKey: "target",
+    accessorKey: "minSelectMedia",
     header: () => <div className="w-full text-right">Target</div>,
     cell: ({ row }) => (
       <form
         onSubmit={(e) => {
           e.preventDefault()
           toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
+            loading: `Saving ${row.original.title}`,
             success: "Done",
             error: "Error",
           })
         }}
       >
-        <Label htmlFor={`${row.original.id}-target`} className="sr-only">
+        <Label htmlFor={`${row.original._id}-target`} className="sr-only">
           Target
         </Label>
         <Input
           className="h-8 w-16 border-transparent bg-transparent text-right shadow-none hover:bg-input/30 focus-visible:border focus-visible:bg-background"
-          defaultValue={row.original.target}
-          id={`${row.original.id}-target`}
+          defaultValue={String(row.original.minSelectMedia)}
+          id={`${row.original._id}-target`}
         />
       </form>
     ),
   },
   {
-    accessorKey: "limit",
+    accessorKey: "maxSelectMedia",
     header: () => <div className="w-full text-right">Limit</div>,
     cell: ({ row }) => (
       <form
         onSubmit={(e) => {
           e.preventDefault()
           toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
+            loading: `Saving ${row.original.title}`,
             success: "Done",
             error: "Error",
           })
         }}
       >
-        <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
+        <Label htmlFor={`${row.original._id}-limit`} className="sr-only">
           Limit
         </Label>
         <Input
           className="h-8 w-16 border-transparent bg-transparent text-right shadow-none hover:bg-input/30 focus-visible:border focus-visible:bg-background"
-          defaultValue={row.original.limit}
-          id={`${row.original.id}-limit`}
+          defaultValue={String(row.original.maxSelectMedia)}
+          id={`${row.original._id}-limit`}
         />
       </form>
     ),
   },
   {
-    accessorKey: "reviewer",
-    header: "Reviewer",
+    accessorKey: "playlistId",
+    header: "Playlist ID",
     cell: ({ row }) => {
-      const isAssigned = row.original.reviewer !== "Assign reviewer"
+      // Check if a playlistId exists
+      const isAssigned = row.original.playlistId !== undefined
 
       if (isAssigned) {
-        return row.original.reviewer
+        const reviewer = String(row.original.playlistId)
+        return reviewer
       }
 
       return (
         <>
-          <Label htmlFor={`${row.original.id}-reviewer`} className="sr-only">
+          <Label htmlFor={`${row.original._id}-reviewer`} className="sr-only">
             Reviewer
           </Label>
           <Select>
             <SelectTrigger
               className="h-8 w-40"
-              id={`${row.original.id}-reviewer`}
+              id={`${row.original._id}-reviewer`}
             >
               <SelectValue placeholder="Assign reviewer" />
             </SelectTrigger>
@@ -421,9 +425,9 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
 ]
 
-function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
+function DraggableRow({ row }: { row: Row<Doc<"coreSections">> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
-    id: row.original.id,
+    id: row.original._id,
   })
 
   return (
@@ -450,8 +454,8 @@ export function DataTable({
   data: initialData,
   columns: customColumns = columns,
 }: {
-  data: z.infer<typeof schema>[]
-  columns?: ColumnDef<z.infer<typeof schema>>[]
+  data: Doc<"coreSections">[]
+  columns?: ColumnDef<Doc<"coreSections">>[]
 }) {
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
@@ -473,7 +477,7 @@ export function DataTable({
   )
 
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ id }) => id) || [],
+    () => data?.map(({ _id }) => _id) || [],
     [data]
   )
 
@@ -487,7 +491,7 @@ export function DataTable({
       columnFilters,
       pagination,
     },
-    getRowId: (row) => row.id.toString(),
+    getRowId: (row) => row._id.toString(),
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,

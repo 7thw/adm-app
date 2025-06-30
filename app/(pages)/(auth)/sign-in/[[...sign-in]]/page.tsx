@@ -1,3 +1,5 @@
+"use client"
+
 import ConvexProviderWithClerk from "@/components/ConvexClientProvider";
 import { SignIn } from "@clerk/nextjs";
 

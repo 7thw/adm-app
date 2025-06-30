@@ -1,11 +1,12 @@
 import { v } from "convex/values";
-import { r2Upload } from "@convex-dev/r2";
+import { R2 } from "@convex-dev/r2";
+import { components } from "./_generated/api";
 
 /**
  * Function for uploading files to R2 storage
  * This is the server-side implementation for @convex-dev/r2/react's useUploadFile hook
  */
-export default r2Upload({
+export default R2({
   /**
    * The bucket name where files will be stored
    * This should match the bucket configured in your R2 setup

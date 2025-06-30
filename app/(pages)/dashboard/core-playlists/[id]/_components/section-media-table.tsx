@@ -26,38 +26,19 @@ import {
   TableCell,
   TableRow
 } from "@/components/ui/table"
+import { Doc } from "@/convex/_generated/dataModel"
 
-// Define types for our component
-type MediaDetails = {
-  _id: Id<"medias">
-  title: string
-  description?: string
-  mediaType: "audio" | "video"
-  // For audio files uploaded to Convex storage
-  storageId?: Id<"_storage">
-  // For video embeds (YouTube, etc.)
-  embedUrl?: string
-  youtubeId?: string
-  // Media metadata
-  duration: number // in seconds
-  fileSize?: number
-  contentType?: string
-  thumbnailStorageId?: Id<"_storage">
-  thumbnailUrl?: string
-  // Processing status
-  processingStatus: "pending" | "processing" | "completed" | "failed"
-  // Audio-specific metadata
-  transcript?: string
-  waveformData?: string
-  quality?: string
-  bitrate?: number
-  // Ownership and access
+// Use Convex-generated types as source of truth
+type MediaDetails = Doc<"medias">
+// SectionMediaRaw represents the join table between sections and media
+
   uploadedBy: Id<"users">
   isPublic: boolean
   _creationTime: number
 }
 
-// This type represents the raw data returned from Convex
+// Use Convex schema directly instead of custom type definitions
+// This avoids redundant type definitions that can drift from the schema
 type SectionMediaRaw = {
   _id: Id<"sectionMedias">
   _creationTime: number
@@ -163,7 +144,7 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
   )
 
   // Fetch section media from Convex
-  const sectionMediaResult = useQuery(api.admin.addMediaToSection ? api.admin.addMediaToSection : api.coreSectionMedia.getBySectionId, {
+  const sectionMediaResult = useQuery(api.admin.getSectionMedia, {
     sectionId
   }) as SectionMediaRaw[] || []
 
