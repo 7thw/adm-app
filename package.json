@@ -7,6 +7,7 @@
     "devall": "concurrently \"pnpm run dev:frontend\" \"pnpm run dev:backend\"",
     "dev:frontend": "next dev --turbopack --port 3100",
     "dev:backend": "convex dev",
+    "lint:fix": "eslint . --fix",
     "build": "next build",
     "start": "next start",
     "stop": "pkill -f 'node.*next'||true",

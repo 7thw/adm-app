@@ -48,8 +48,8 @@ export function PlaylistForm({
   const categories = useQuery(api.admin.listCoreCategories, { includeInactive: false }) || []
 
   // Convex mutations
-  const createPlaylist = useMutation(api.corePlaylists.create)
-  const updatePlaylist = useMutation(api.corePlaylists.update)
+  const createPlaylist = useMutation(api.admin.createCorePlaylist)
+  const updatePlaylist = useMutation(api.admin.updateCorePlaylist)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,13 +71,13 @@ export function PlaylistForm({
 
       if (isEdit && initialData?._id) {
         // Update existing playlist
-        playlistId = await updatePlaylist({
-          id: initialData._id,
+        await updatePlaylist({
+          playlistId: initialData._id,
           title,
           description: description || "",
-          categoryId: categoryId as unknown as Id<"coreCategories">,
-          status
+          categoryId: categoryId as unknown as Id<"coreCategories">
         })
+        playlistId = initialData._id
         toast.success("corePlaylist updated successfully")
       } else {
         // Create new playlist

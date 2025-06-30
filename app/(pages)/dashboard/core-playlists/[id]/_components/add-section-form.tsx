@@ -24,7 +24,7 @@ interface AddSectionFormProps {
 }
 
 export default function AddSectionForm({ corePlaylistId }: AddSectionFormProps) {
-  const createSection = useMutation(api.coreSections.create);
+  const createSection = useMutation(api.admin.createCoreSection);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");

@@ -1,4 +1,4 @@
-// FormMedia.tsx - REWRITTEN TO USE OFFICIAL R2 COMPONENT PATTERN
+// FormMedia.tsx - ENHANCED WITH OFFICIAL CONVEX R2 COMPONENTS
 "use client"
 
 import { Button } from "@/components/ui/button"
@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
+import { Progress } from "@/components/ui/progress"
 import { api } from "@/convex/_generated/api"
 import { useMutation } from "convex/react"
 import { useUploadFile } from "@convex-dev/r2/react" // OFFICIAL R2 HOOK
-import { Loader2, Music, Video } from "lucide-react"
-import { FormEvent, useRef, useState } from "react"
+import { Loader2, Music, Video, FileAudio, X } from "lucide-react"
+import { FormEvent, useRef, useState, useEffect } from "react"
 import { toast } from "sonner"
 
 interface FormMediaProps {
@@ -25,21 +26,39 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
   const [duration, setDuration] = useState<number>(0)
   const [isUploading, setIsUploading] = useState(false)
 
+  // Enhanced R2 upload state
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
   const audioFileRef = useRef<HTMLInputElement>(null)
   const [selectedAudioFile, setSelectedAudioFile] = useState<File | null>(null)
 
-  // OFFICIAL R2 APPROACH: Use the useUploadFile hook
-  const uploadFile = useUploadFile(api.R2)
-  const updateMetadata = useMutation(api.media.updateUploadMetadata)
+  // OFFICIAL CONVEX R2 INTEGRATION
+  // The useUploadFile hook doesn't need any arguments in the latest version
+  const uploadFile = useUploadFile()
+  const updateMetadata = useMutation(api.admin.updateMediaMetadata)
 
   // Convex mutations
-  const createVideoMedia = useMutation(api.media.createVideoMedia)
+  const createVideoMedia = useMutation(api.admin.createMedia)
 
   // Validate YouTube URL
   const isValidYouTubeUrl = (url: string): boolean => {
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[a-zA-Z0-9_-]{11}$/
     return youtubeRegex.test(url)
   }
+
+  // Extract YouTube ID from URL
+  const extractYoutubeId = (url: string): string => {
+    // Match YouTube URL patterns
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    
+    if (match && match[2].length === 11) {
+      return match[2];
+    }
+    return ""; // Return empty string instead of undefined
+  };
 
   // Extract duration from audio file
   const getAudioDuration = (file: File): Promise<number> => {
@@ -60,22 +79,46 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
     })
   }
 
+  // Clean up object URLs when component unmounts or when file changes
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl)
+      }
+    }
+  }, [previewUrl])
+
   const handleAudioFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    // Clear previous state
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl)
+      setPreviewUrl(null)
+    }
+    setUploadError(null)
+    setUploadProgress(0)
+
     const file = event.target.files?.[0]
     if (file) {
       // Validate file type
-      if (!file.type.startsWith('audio/')) {
-        toast.error("Please select a valid audio file")
+      const validAudioTypes = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg"]
+      if (!validAudioTypes.includes(file.type)) {
+        toast.error("Please select a valid audio file (MP3, WAV, OGG)")
+        if (audioFileRef.current) audioFileRef.current.value = ""
         return
       }
 
       // Validate file size (50MB limit)
       if (file.size > 50 * 1024 * 1024) {
         toast.error("File size must be less than 50MB")
+        if (audioFileRef.current) audioFileRef.current.value = ""
         return
       }
 
       setSelectedAudioFile(file)
+
+      // Create preview URL
+      const objectUrl = URL.createObjectURL(file)
+      setPreviewUrl(objectUrl)
 
       // Auto-extract duration
       try {
@@ -124,39 +167,44 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
     if (!validateForm()) return
 
     setIsUploading(true)
+    setUploadError(null)
+    setUploadProgress(0)
 
     try {
       if (mediaType === "audio" && selectedAudioFile) {
-        console.log("Starting audio upload with official R2 pattern...")
-
-        // Capture file metadata before upload
-        const fileMetadata = {
-          contentType: selectedAudioFile.type,
-          fileSize: selectedAudioFile.size,
-          fileName: selectedAudioFile.name,
-        };
-
-        console.log("Uploading file with metadata:", fileMetadata);
-
-        // OFFICIAL R2 PATTERN: Just use the useUploadFile hook
-        // The hook will call generateUploadUrl and syncMetadata automatically
-        const uploadKey = await uploadFile(selectedAudioFile)
-
-        console.log("Upload completed with key:", uploadKey)
-
-        // Update the database record with actual file metadata and form data
+        setIsUploading(true)
+        
+        // The hook handles generateUploadUrl and syncMetadata automatically
+        let uploadKey: string
+        let fileSize: number = selectedAudioFile.size
+        let contentType: string = selectedAudioFile.type
+        
         try {
+          // Upload file and get the upload key
+          const result = await uploadFile(selectedAudioFile, {
+            onProgress: (progress) => {
+              setUploadProgress(Math.round(progress * 100))
+            }
+          })
+          uploadKey = result.uploadKey
+          console.log("Upload completed with key:", uploadKey)
+          
+          // Update the database record with actual file metadata and form data
           await updateMetadata({
             uploadKey,
-            contentType: fileMetadata.contentType,
-            fileSize: fileMetadata.fileSize,
+            contentType: selectedAudioFile.type,
+            fileSize: selectedAudioFile.size,
             title: title.trim(),
             description: description.trim(),
             duration,
           });
           console.log("✅ Metadata updated successfully");
-        } catch (metadataError) {
-          console.warn("Failed to update metadata, but upload succeeded:", metadataError);
+        } catch (uploadError) {
+          console.error("Upload failed:", uploadError)
+          setUploadError(uploadError instanceof Error ? uploadError.message : "Upload failed")
+          toast.error("File upload failed. Please try again.")
+          setIsUploading(false)
+          return
         }
 
         toast.success("Audio uploaded successfully!")
@@ -165,7 +213,9 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
         await createVideoMedia({
           title: title.trim(),
           description: description.trim(),
-          mediaUrl: youtubeUrl.trim(),
+          embedUrl: youtubeUrl.trim(),
+          youtubeId: extractYoutubeId(youtubeUrl.trim()),
+          mediaType: "video",
           duration,
         })
 
@@ -173,13 +223,15 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
       }
 
       // Reset form
-      setTitle("")
-      setDescription("")
-      setYoutubeUrl("")
-      setDuration(0)
-      setSelectedAudioFile(null)
-      if (audioFileRef.current) {
-        audioFileRef.current.value = ""
+      const resetForm = () => {
+        setTitle("")
+        setDescription("")
+        setYoutubeUrl("")
+        setDuration(0)
+        setSelectedAudioFile(null)
+        if (audioFileRef.current) {
+          audioFileRef.current.value = ""
+        }
       }
 
       // Call onSuccess callback if provided
@@ -261,22 +313,73 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
           />
         </div>
 
-        {/* Audio File Upload */}
+        {/* Audio File Upload with Enhanced R2 Integration */}
         {mediaType === "audio" && (
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="audio-file-form" className="text-sm">Audio File *</Label>
             <Input
               id="audio-file-form"
               type="file"
-              accept="audio/*"
+              accept="audio/mp3,audio/mpeg,audio/wav,audio/ogg"
               ref={audioFileRef}
               onChange={handleAudioFileChange}
               required
               className="text-sm"
             />
+
+            {/* File Preview */}
             {selectedAudioFile && (
-              <p className="text-xs text-muted-foreground">
-                {selectedAudioFile.name} ({(selectedAudioFile.size / 1024 / 1024).toFixed(1)} MB)
+              <div className="border rounded-md p-3 bg-muted/30 relative">
+                <div className="flex items-center gap-2">
+                  <FileAudio className="h-8 w-8 text-primary" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{selectedAudioFile.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedAudioFile.type} • {(selectedAudioFile.size / 1024 / 1024).toFixed(1)} MB
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => {
+                      setSelectedAudioFile(null)
+                      if (audioFileRef.current) audioFileRef.current.value = ""
+                      if (previewUrl) {
+                        URL.revokeObjectURL(previewUrl)
+                        setPreviewUrl(null)
+                      }
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Audio Preview Player */}
+                {previewUrl && (
+                  <audio
+                    controls
+                    src={previewUrl}
+                    className="w-full mt-2 h-8"
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Upload Progress */}
+            {isUploading && mediaType === "audio" && (
+              <div className="space-y-1">
+                <Progress value={uploadProgress} className="h-1" />
+                <p className="text-xs text-muted-foreground">
+                  Uploading: {uploadProgress}%
+                </p>
+              </div>
+            )}
+
+            {/* Upload Error */}
+            {uploadError && (
+              <p className="text-xs text-destructive">
+                Error: {uploadError}
               </p>
             )}
           </div>

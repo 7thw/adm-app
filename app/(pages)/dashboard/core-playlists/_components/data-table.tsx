@@ -159,11 +159,11 @@ export function DataTable<TData extends TableData>({
   })
 
   // Convex mutations
-  const updateSection = useMutation(api.admin.coreSections.update)
-  const deleteSection = useMutation(api.admin.coreSections.remove)
-  const reorderSections = useMutation(api.admin.coreSections.reorder)
+  const updateSection = useMutation(api.admin.updateCoreSection)
+  const deleteSection = useMutation(api.admin.removeCoreSection)
+  const reorderSections = useMutation(api.admin.reorderCoreSections)
   // TODO: Add duplicate function to coreSections API
-  // const duplicateSection = useMutation(api.admin.coreSections.duplicate)
+  // const duplicateSection = useMutation(api.admin.duplicateCoreSection)
 
   const sortableId = React.useId()
   const sensors = useSensors(
@@ -380,7 +380,7 @@ export function DataTable<TData extends TableData>({
     }
 
     try {
-      await deleteSection({ id: section._id })
+      await deleteSection({ sectionId: section._id })
       toast.success("Section deleted successfully")
     } catch (error) {
       console.error("Error deleting section:", error)
