@@ -14,20 +14,20 @@ CorePlaylists/
 ├── new/
 │   └── page.tsx                 # Create new playlist
 ├── [id]/
-│   ├── page.tsx                 # Playlist details
+│   ├── page.tsx                 # corePlaylist details
 │   ├── edit/
 │   │   └── page.tsx             # Edit playlist
 │   ├── preview/
 │   │   ├── page.tsx             # Mobile preview
 │   │   ├── types.ts             # TypeScript definitions
 │   │   ├── tracks.ts            # Sample track data
-│   │   ├── use-playlist.ts      # Playlist state management
+│   │   ├── use-playlist.ts      # corePlaylist state management
 │   │   └── _components/         # Preview-specific components
 │   └── _components/
 │       └── add-section-form.tsx # Section creation form
 └── _components/                 # Shared components
     ├── data-table.tsx           # Main sections table
-    ├── playlist-form.tsx        # Playlist creation/edit form
+    ├── playlist-form.tsx        # corePlaylist creation/edit form
     ├── media-data-table.tsx     # Media management table
     └── section-media-table.tsx  # Section media management
 ```
@@ -54,7 +54,7 @@ The system operates on four main entities:
 
 ## 🚀 Features
 
-### 📝 Playlist Management
+### 📝 corePlaylist Management
 - Create and edit playlists with rich metadata
 - Category-based organization
 - Draft/Published status system
@@ -192,7 +192,7 @@ interface SectionMediaTableProps {
 
 ## 📚 Usage Examples
 
-### Creating a New Playlist
+### Creating a New corePlaylist
 
 ```tsx
 import { PlaylistForm } from './_components/playlist-form'
@@ -204,7 +204,7 @@ function CreatePlaylistPage() {
 
   return (
     <PlaylistForm
-      submitLabel="Create Playlist"
+      submitLabel="Create corePlaylist"
       onSuccess={handleSuccess}
     />
   )
@@ -311,6 +311,6 @@ npm run type-check
 
 ---
 
-**Last Updated:** June 4, 2025  
-**Version:** 1.0.0  
+**Last Updated:** June 4, 2025
+**Version:** 1.0.0
 **Maintainer:** Realigna Development Team

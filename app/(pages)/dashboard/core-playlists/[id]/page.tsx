@@ -1,22 +1,21 @@
 "use client"
 
-import React from "react"
-import { notFound } from "next/navigation"
-import { useRouter } from "next/navigation"
-import { ColumnDef } from "@tanstack/react-table"
-import { CheckCircle2Icon, LoaderIcon, PlusIcon, ArrowLeftIcon } from "lucide-react"
-import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { Doc, Id } from "@/convex/_generated/dataModel"
+import { ColumnDef } from "@tanstack/react-table"
+import { useQuery } from "convex/react"
+import { ArrowLeftIcon, CheckCircle2Icon, LoaderIcon, PlusIcon } from "lucide-react"
+import { notFound, useRouter } from "next/navigation"
+import React from "react"
 import { z } from "zod"
 
+import { DataTable, schema } from "@/app/(pages)/dashboard/core-playlists/[id]/_components/data-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { DataTable, schema } from "@/app/(pages)/dashboard/core-playlists/[id]/_components/data-table"
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import AddSectionForm from "./_components/add-section-form"
 
 interface CorePlaylistPageProps {
@@ -196,7 +195,7 @@ export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
     return (
       <div className="container mx-auto py-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Playlist Not Found</h1>
+          <h1 className="text-2xl font-bold mb-4">corePlaylist Not Found</h1>
           <p className="text-muted-foreground">The requested playlist could not be found.</p>
         </div>
       </div>
@@ -204,7 +203,7 @@ export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
   }
 
   // Get category name for display
-  const categories = useQuery(api.playlistCategories.getAll, {}) || []
+  const categories = useQuery(api.admin.listCoreCategories, { includeInactive: true }) || []
   const getCategoryName = (categoryId: string) => {
     const category = categories.find((cat: any) => cat._id === categoryId)
     return category ? category.name : "Unknown Category"
@@ -217,7 +216,7 @@ export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
           <ArrowLeftIcon className="h-4 w-4" />
           <span className="sr-only">Back</span>
         </Button>
-        <h1 className="text-3xl font-bold">Playlist Details</h1>
+        <h1 className="text-3xl font-bold">corePlaylist Details</h1>
       </div>
 
       <div className="mb-8">
@@ -233,7 +232,7 @@ export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => router.push(`/dashboard/core-playlists/${id}/edit`)}>
-            Edit Playlist
+            Edit corePlaylist
           </Button>
           <Button variant="secondary">Preview</Button>
         </div>
@@ -241,7 +240,7 @@ export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
 
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Playlist Sections</h2>
+          <h2 className="text-xl font-semibold">corePlaylist Sections</h2>
           <Sheet>
             <SheetTrigger asChild>
               <Button>

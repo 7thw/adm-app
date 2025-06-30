@@ -13,13 +13,13 @@ interface CorePlaylistClientWrapperProps {
 
 export default function CorePlaylistClientWrapper({ stringId }: CorePlaylistClientWrapperProps) {
   const router = useRouter();
-  
+
   // Instead of trying to convert the ID directly, we'll use a special query
   // that will try to find the playlist by its string ID
   const playlist = useQuery(api.corePlaylists.getByStringId, { stringId });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  
+
   useEffect(() => {
     // Give the query some time to resolve
     const timer = setTimeout(() => {
@@ -28,7 +28,7 @@ export default function CorePlaylistClientWrapper({ stringId }: CorePlaylistClie
         setError(true);
       }
     }, 2000);
-    
+
     return () => clearTimeout(timer);
   }, [playlist]);
 
@@ -40,12 +40,12 @@ export default function CorePlaylistClientWrapper({ stringId }: CorePlaylistClie
       </div>
     );
   }
-  
+
   // If there was an error or no playlist found, show an error message
   if (error || playlist === null) {
     return (
       <div className="p-8 text-center">
-        <h2 className="text-xl font-semibold mb-2">Invalid Playlist ID</h2>
+        <h2 className="text-xl font-semibold mb-2">Invalid corePlaylist ID</h2>
         <p className="text-muted-foreground">The playlist ID provided is not valid.</p>
       </div>
     );

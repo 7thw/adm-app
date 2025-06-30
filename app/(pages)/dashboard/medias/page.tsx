@@ -1,40 +1,46 @@
 "use client"
 
 import { api } from "@/convex/_generated/api"
+import { Doc, Id } from "@/convex/_generated/dataModel"
 import { useUser } from "@clerk/nextjs"
 import { useQuery } from "convex/react"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { DataTable } from "./_components/data-table"
 import { SectionCards } from "./_components/section-cards"
+import { schema } from "./_components/data-table"
 
 export default function MediasPage() {
   const { isSignedIn, isLoaded } = useUser()
 
-  // Use the working getAllMedia query - Convex functions handle admin authorization
-  const mediaResponse = useQuery(api.media.getAllMedia, isSignedIn ? {} : "skip");
+  // Use the medias query from the API
+  const mediaResponse = useQuery(api.admin.listMedias, isSignedIn ? {} : "skip");
 
   // Process the data to ensure it matches the expected schema
   const mediaData = (mediaResponse || []).map(item => ({
     _id: item._id,
     title: item.title || "",
-    mediaType: item.mediaType || "",
-    mediaUrl: item.mediaUrl || "",
+    mediaType: item.mediaType || "audio", // Default to audio if not specified
+    // Generate URLs from storage IDs or use embed URLs
     duration: item.duration || 0, // Ensure duration is never undefined
-    createdAt: item.createdAt || item._creationTime || 0,
-    updatedAt: item.updatedAt || 0,
     description: item.description,
-    thumbnailUrl: item.thumbnailUrl,
+    thumbnailUrl: item.thumbnailUrl || undefined, // Convert null to undefined
     fileSize: item.fileSize,
     contentType: item.contentType,
-    uploadKey: item.uploadKey,
-    userId: item.userId,
-    uploadStatus: item.uploadStatus,
+    storageId: item.storageId,
+    embedUrl: item.embedUrl,
+    youtubeId: item.youtubeId,
+    thumbnailStorageId: item.thumbnailStorageId,
+    processingStatus: item.processingStatus || "completed",
+    transcript: item.transcript,
+    waveformData: item.waveformData,
+    quality: item.quality,
+    bitrate: item.bitrate,
+    uploadedBy: item.uploadedBy,
+    isPublic: item.isPublic,
     _creationTime: item._creationTime
   }));
 
-  // Debug logging
-  console.log("Media response from Convex:", mediaResponse);
-  console.log("Processed media data:", mediaData);
+  // Debug logging removed for production
 
   // Loading state
   if (!isLoaded) {

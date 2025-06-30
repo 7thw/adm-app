@@ -59,7 +59,7 @@ export default function CorePlaylistEditor({ id }: CorePlaylistEditorProps) {
       if (!categoryId) {
         throw new Error("Category is required");
       }
-      
+
       await updateCorePlaylist({
         id,
         title,
@@ -114,13 +114,13 @@ export default function CorePlaylistEditor({ id }: CorePlaylistEditorProps) {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="details">Playlist Details</TabsTrigger>
+          <TabsTrigger value="details">corePlaylist Details</TabsTrigger>
           <TabsTrigger value="sections">Sections & Media</TabsTrigger>
         </TabsList>
         <TabsContent value="details" className="space-y-4 pt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Playlist Information</CardTitle>
+              <CardTitle>corePlaylist Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -180,7 +180,7 @@ export default function CorePlaylistEditor({ id }: CorePlaylistEditorProps) {
                   </label>
                   <Select
                     value={status}
-                    onValueChange={(value) => 
+                    onValueChange={(value) =>
                       setStatus(value as "draft" | "published")
                     }
                   >

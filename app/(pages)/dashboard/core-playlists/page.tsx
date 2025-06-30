@@ -1,6 +1,7 @@
 "use client";
 
 import { api } from "@/convex/_generated/api";
+import { Doc, Id } from "@/convex/_generated/dataModel";
 import { useQuery } from "convex/react";
 import { Edit, Link, List, Loader2, PlusCircle, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -11,14 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
-// Inside your component
-const router = useRouter();
-
-// Add this function definition
-const handleCreatePlaylist = () => {
-  router.push("/dashboard/core-playlists/create");
-};
-
 export default function CorePlaylistsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
@@ -26,26 +19,32 @@ export default function CorePlaylistsPage() {
   // Fetch core playlists from Convex with proper typing
   const playlists = useQuery(api.corePlaylists.getAll, {}) || [];
 
-  // Get playlist categories to display category names
-  const categories = useQuery(api.playlistCategories.getAll, {}) || [];
+  // Get categories to display category names
+  const categories = useQuery(api.coreCategories.getAll, {}) || [];
 
   // Loading state based on Convex query
   const isLoading = playlists === undefined;
 
   // Get category name by ID
-  const getCategoryName = (categoryId: string) => {
-    const category = categories.find(cat => cat._id === categoryId);
+  const getCategoryName = (categoryId: string | Id<"coreCategories">) => {
+    if (!categoryId) return "Uncategorized";
+    const category = categories.find((cat: Doc<"coreCategories">) => cat._id === categoryId);
     return category ? category.name : "Unknown Category";
   };
 
   // Filter playlists based on search query
-  const filteredPlaylists = playlists.filter(playlist => {
+  const filteredPlaylists = playlists.filter((playlist: Doc<"corePlaylists">) => {
     const titleMatch = playlist.title?.toLowerCase().includes(searchQuery.toLowerCase()) || false;
     const descriptionMatch = playlist.description?.toLowerCase().includes(searchQuery.toLowerCase()) || false;
     const categoryMatch = getCategoryName(playlist.categoryId).toLowerCase().includes(searchQuery.toLowerCase());
 
     return titleMatch || descriptionMatch || categoryMatch;
   });
+  
+  // Handler for creating new playlist
+  const handleCreatePlaylist = () => {
+    router.push("/dashboard/core-playlists/new");
+  };
 
   return (
     <div className="container mx-auto py-6">
@@ -56,7 +55,7 @@ export default function CorePlaylistsPage() {
         </div>
         <Button onClick={handleCreatePlaylist}>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Create Playlist
+          Create corePlaylist
         </Button>
       </div>
 
@@ -122,7 +121,7 @@ export default function CorePlaylistsPage() {
                     className="gap-2"
                   >
                     <Edit className="h-4 w-4" />
-                    Edit Playlist
+                    Edit corePlaylist
                   </Button>
                 </div>
 

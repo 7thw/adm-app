@@ -14,13 +14,12 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useMutation, useQuery } from "convex/react"
-import { Check, GripVertical, PlayCircle, Sparkles, Trash2, X } from "lucide-react"
-import { useEffect, useState } from "react"
+import { Check, GripVertical, PlayCircle, Sparkles, Trash2 } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Table,
   TableBody,
@@ -30,39 +29,53 @@ import {
 
 // Define types for our component
 type MediaDetails = {
-  _id: Id<"media">
+  _id: Id<"medias">
   title: string
-  description: string
+  description?: string
   mediaType: "audio" | "video"
-  fileUrl: string
-  fileKey: string
-  fileSize: number
-  contentType: string
-  userId: string
-  createdAt: string
-  updatedAt: string
-  duration?: number
+  // For audio files uploaded to Convex storage
+  storageId?: Id<"_storage">
+  // For video embeds (YouTube, etc.)
+  embedUrl?: string
+  youtubeId?: string
+  // Media metadata
+  duration: number // in seconds
+  fileSize?: number
+  contentType?: string
+  thumbnailStorageId?: Id<"_storage">
+  thumbnailUrl?: string
+  // Processing status
+  processingStatus: "pending" | "processing" | "completed" | "failed"
+  // Audio-specific metadata
+  transcript?: string
+  waveformData?: string
+  quality?: string
+  bitrate?: number
+  // Ownership and access
+  uploadedBy: Id<"users">
+  isPublic: boolean
   _creationTime: number
 }
 
 // This type represents the raw data returned from Convex
 type SectionMediaRaw = {
-  _id: Id<"sectionMedia">
+  _id: Id<"sectionMedias">
   _creationTime: number
   sectionId: Id<"coreSections">
-  mediaId: Id<"media">
+  mediaId: Id<"medias">
   order: number
   isRequired?: boolean
-  createdAt: number
+  isOptional?: boolean
+  defaultSelected?: boolean
 }
 
 // This type represents the data structure used in the UI
 type SectionMediaItem = {
-  _id: Id<"sectionMedia">
+  _id: Id<"sectionMedias">
   sectionId: Id<"coreSections">
-  mediaId: Id<"media">
+  mediaId: Id<"medias">
   order: number
-  selectMedia: boolean // Mapped from isRequired
+  selectMedia: boolean // Mapped from isRequired/defaultSelected
   media: MediaDetails | null
 }
 
@@ -75,8 +88,8 @@ type SectionMediaTableProps = {
 // Sortable item component for drag and drop
 function SortableMediaRow({ item, onToggleSelect, onDelete, onPlayMedia }: {
   item: SectionMediaItem
-  onToggleSelect: (id: Id<"sectionMedia">, selected: boolean) => void
-  onDelete: (id: Id<"sectionMedia">) => void
+  onToggleSelect: (id: Id<"sectionMedias">, selected: boolean) => void
+  onDelete: (id: Id<"sectionMedias">) => void
   onPlayMedia?: (media: MediaDetails) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item._id.toString() })
@@ -150,17 +163,18 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
   )
 
   // Fetch section media from Convex
-  const sectionMediaResult = useQuery(api.coreSectionMedia.getBySectionId, {
+  const sectionMediaResult = useQuery(api.admin.addMediaToSection ? api.admin.addMediaToSection : api.coreSectionMedia.getBySectionId, {
     sectionId
   }) as SectionMediaRaw[] || []
-  
-  // Fetch media details for each section media item
-  const mediaIds = sectionMediaResult.map(item => item.mediaId)
-  const mediaDetails = useQuery(api.media.getByIds, { ids: mediaIds }) || []
-  
+
+  // Fetch all media using admin API
+  const allMedia = useQuery(api.admin.listMedias, { mediaType: undefined }) || []
+
   // Transform raw data into SectionMediaItem format
-  const sectionMedia = sectionMediaResult.map(item => {
-    const media = mediaDetails.find(m => m._id.equals(item.mediaId)) || null
+  const sectionMedias = sectionMediaResult.map(item => {
+    // Find the corresponding media item
+    const media = allMedia.find(m => m._id.toString() === item.mediaId.toString()) || null
+
     return {
       ...item,
       selectMedia: item.isRequired || false,
@@ -169,14 +183,14 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
   }).filter(item => item.media !== null) as SectionMediaItem[]
 
   // Sort media by order
-  const sortedMedia = [...sectionMedia].sort((a, b) => a.order - b.order)
+  const sortedMedia = [...sectionMedias].sort((a, b) => a.order - b.order)
 
   // Update selected count when media loads
   useEffect(() => {
-    if (sectionMedia.length > 0) {
-      setSelectedCount(sectionMedia.filter(item => item.selectMedia).length)
+    if (sectionMedias.length > 0) {
+      setSelectedCount(sectionMedias.filter(item => item.selectMedia).length)
     }
-  }, [sectionMedia])
+  }, [sectionMedias])
 
   // Mutations
   const updateSelection = useMutation(api.coreSectionMedia.updateSelection)
@@ -204,30 +218,33 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
 
       // Save the new order to the database
       reorderMedia({
-        coreSectionId: sectionId,
         mediaOrders
       })
     }
   }
 
-  // Handle toggling media selection
-  const handleToggleSelect = async (id: Id<"sectionMedia">, selected: boolean) => {
+  // Handle toggle select
+  const handleToggleSelect = useCallback(async (id: Id<"sectionMedias">, selected: boolean) => {
     try {
-      // No limits enforced in edit page - allow unlimited selection for editing purposes
-      await updateSelection({ id, selectMedia: selected })
+      // Check if we're at max selection limit
+      if (selected && maxSelectMedia && selectedCount >= maxSelectMedia) {
+        toast.error(`You can only select up to ${maxSelectMedia} media items`)
+        return
+      }
 
-      // Update the selected count
+      // Update selection in Convex - use isRequired instead of selectMedia
+      await updateSelection({ id, isRequired: selected })
+
+      // Update local state
       setSelectedCount(prev => selected ? prev + 1 : prev - 1)
-
-      toast.success(`Media ${selected ? 'selected' : 'unselected'} successfully`)
     } catch (error) {
-      console.error("Error updating selection:", error)
+      console.error("Error toggling selection:", error)
       toast.error("Failed to update selection")
     }
-  }
+  }, [maxSelectMedia, selectedCount, updateSelection])
 
   // Handle deleting media from section
-  const handleDelete = async (id: Id<"sectionMedia">) => {
+  const handleDelete = async (id: Id<"sectionMedias">) => {
     try {
       // Check if the item is selected before removing
       const item = sortedMedia.find(item => item._id === id)

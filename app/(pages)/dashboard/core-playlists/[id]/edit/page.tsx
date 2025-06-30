@@ -5,7 +5,7 @@ import { Id } from "@/convex/_generated/dataModel"
 import { useMutation, useQuery } from "convex/react"
 import { AlertTriangle, ArrowLeftIcon, GripVertical, PlusIcon, SaveIcon, Trash2 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import {
@@ -46,33 +46,32 @@ import { Textarea } from "@/components/ui/textarea"
 type CoreSection = {
   _id: Id<"coreSections">
   title: string
-  description: string
-  type: "base" | "loop"
-  order: number
-  maxSelectMedia?: number
-  maxLoopTimer?: number
-  countDownTimer?: number
+  description?: string
+  sectionType: "base" | "loop"
+  coreSectionOrder: number
+  minSelectMedia: number
+  maxSelectMedia: number
 }
 
 type MediaItem = {
-  _id: Id<"media">
+  _id: Id<"medias">
   title: string
-  description: string
-  fileUrl: string
+  description?: string
+  mediaUrl: string
   duration?: number
   mediaType: "audio" | "video"
-  fileKey: string
-  fileSize: number
-  contentType: string
-  createdAt: string
-  updatedAt: string
-  userId: string
+  uploadKey?: string
+  fileSize?: number
+  contentType?: string
+  createdAt: number
+  updatedAt: number
+  userId?: string
 }
 
 type CoreSectionMedia = {
-  _id: Id<"sectionMedia">
+  _id: Id<"coreSectionMedias">
   sectionId: Id<"coreSections">
-  mediaId: Id<"media">
+  mediasId: Id<"medias">
   order: number
   isRequired?: boolean
 }
@@ -105,8 +104,8 @@ function SortableSection({ section, onEdit, onDelete, children }: {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl">{section.title}</CardTitle>
                 <div className="flex items-center gap-2">
-                  <Badge variant={section.type === "base" ? "outline" : "default"}>
-                    {section.type === "base" ? "Base" : "Loop"}
+                  <Badge variant={section.sectionType === "base" ? "outline" : "default"}>
+                    {section.sectionType === "base" ? "Base" : "Loop"}
                   </Badge>
                   <Button variant="ghost" size="icon" onClick={() => onEdit(section)}>
                     <SaveIcon className="h-4 w-4" />
@@ -133,13 +132,13 @@ export default function CorePlaylistEditPage() {
   const router = useRouter()
   const id = params.id as string
 
-  // State for playlist editing
+  // State for corePlaylist editing
   const [title, setTitle] = useState<string>("")
   const [description, setDescription] = useState<string>("")
-  const [categoryId, setCategoryId] = useState<Id<"playlistCategories"> | "">("")
+  const [categoryId, setCategoryId] = useState<Id<"coreCategories"> | "">("")
   const [status, setStatus] = useState<"draft" | "published">("draft")
   const [isSaving, setIsSaving] = useState(false)
-  const [isPlaylistSaved, setIsPlaylistSaved] = useState(false)
+  const [isCorePlaylistSaved, setIsCorePlaylistSaved] = useState(true)
   const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null)
 
   // State for section management
@@ -148,7 +147,7 @@ export default function CorePlaylistEditPage() {
   const [isAddingSectionOpen, setIsAddingSectionOpen] = useState(false)
 
   // State for media management
-  const [sectionMedia, setSectionMedia] = useState<Record<string, CoreSectionMedia[]>>({})
+  const [sectionMedias, setSectionMedia] = useState<Record<string, CoreSectionMedia[]>>({})
   const [allMedia, setAllMedia] = useState<MediaItem[]>([])
   const [isAddingMedia, setIsAddingMedia] = useState(false)
   const [currentSectionId, setCurrentSectionId] = useState<Id<"coreSections"> | null>(null)
@@ -172,100 +171,114 @@ export default function CorePlaylistEditPage() {
   )
 
   // Fetch data from Convex
-  const playlist = useQuery(api.corePlaylists.getByStringId, { id: id })
-  const categories = useQuery(api.playlistCategories.getAll) || []
+  const corePlaylist = useQuery(api.corePlaylists.getByStringId, { id: id })
+  const categories = useQuery(api.coreCategories.getAll) || []
   const fetchedSections = useQuery(api.coreSections.getByCorePlaylistId,
-    playlist ? { playlistId: playlist._id as Id<"corePlaylists"> } : "skip"
+    corePlaylist ? { playlistId: corePlaylist._id as Id<"corePlaylists"> } : "skip"
   ) || []
-  const media = useQuery(api.media.getAllMedia) || []
+  const media = useQuery(api.medias.getAllMedia, {}) || []
 
   // Mutations
-  const updatePlaylist = useMutation(api.corePlaylists.update)
-  const createSection = useMutation(api.coreSections.create)
-  const deletePlaylist = useMutation(api.corePlaylists.remove)
-  const updateSection = useMutation(api.coreSections.update)
-  const deleteSection = useMutation(api.coreSections.remove)
-  const reorderSections = useMutation(api.coreSections.reorder)
-  const addMedia = useMutation(api.coreSectionMedia.addMedia)
+  const updateCorePlaylist = useMutation(api.corePlaylists.update)
+  const createSectionMutation = useMutation(api.coreSections.create)
+  const deleteCorePlaylistMutation = useMutation(api.corePlaylists.remove)
+  const updateSectionMutation = useMutation(api.coreSections.update)
+  const deleteSectionMutation = useMutation(api.coreSections.remove)
+  const reorderSectionsMutation = useMutation(api.coreSections.reorder)
+  const addMediaMutation = useMutation(api.coreSectionMedia.addMedia)
 
   useEffect(() => {
-    if (playlist) {
-      setTitle(playlist.title)
-      setDescription(playlist.description)
-      setCategoryId(playlist.categoryId as Id<"playlistCategories">)
-      setStatus(playlist.status as "draft" | "published")
-      setIsPlaylistSaved(true) // Consider existing playlists as already saved
+    if (corePlaylist && 'title' in corePlaylist) {
+      setTitle(corePlaylist.title)
+      setDescription(corePlaylist.description || "")
+      setCategoryId(corePlaylist.categoryId as Id<"coreCategories">)
+      setStatus(corePlaylist.status as "draft" | "published")
+      setIsCorePlaylistSaved(true) // Consider existing corePlaylists as already saved
     }
-  }, [playlist])
+  }, [corePlaylist])
 
   // Auto-save effect
   useEffect(() => {
-    // Only set up auto-save if we have a valid playlist and required fields
-    if (playlist && title && categoryId) {
-      // Clear any existing timeout
-      if (autoSaveTimeout) {
-        clearTimeout(autoSaveTimeout)
-      }
+    if (!corePlaylist || !title || !categoryId) return
 
-      // Set a new timeout for auto-saving
-      const timeout = setTimeout(() => {
-        handleSavePlaylist(true) // Pass true to indicate it's an auto-save
-      }, 2000) // Auto-save after 2 seconds of inactivity
-
-      setAutoSaveTimeout(timeout)
+    // Don't auto-save if the corePlaylist was just loaded
+    const isInitialLoad = useRef(true)
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false
+      return
     }
 
-    // Clean up the timeout when component unmounts
-    return () => {
-      if (autoSaveTimeout) {
-        clearTimeout(autoSaveTimeout)
-      }
-    }
-  }, [title, description, categoryId, status])
+    // Set a timer to auto-save after 1 second of inactivity
+    const timer = setTimeout(() => {
+      handleSaveCorePlaylist(true)
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [title, description, categoryId, status, corePlaylist])
 
   useEffect(() => {
     if (fetchedSections.length > 0) {
-      const sortedSections = [...fetchedSections].sort((a, b) => a.order - b.order)
+      const sortedSections = [...fetchedSections].sort((a, b) => a.coreSectionOrder - b.coreSectionOrder)
       setSections(sortedSections)
     }
   }, [fetchedSections])
 
   useEffect(() => {
-    if (media.length > 0) {
-      setAllMedia(media)
+    if (media && media.length > 0) {
+      const allMedia = media.map((m: any) => ({
+        _id: m._id,
+        title: m.title,
+        description: m.description,
+        mediaUrl: m.mediaUrl,
+        duration: m.duration,
+        mediaType: m.mediaType,
+        uploadKey: m.uploadKey,
+        fileSize: m.fileSize,
+        contentType: m.contentType,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+        userId: m.userId,
+      }))
+      setAllMedia(allMedia)
     }
   }, [media])
 
   const handleSectionDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
 
-    if (over && active.id !== over.id) {
-      setSections((sections) => {
-        const oldIndex = sections.findIndex(s => s._id.toString() === active.id)
-        const newIndex = sections.findIndex(s => s._id.toString() === over.id)
+    if (!over || active.id === over.id) return
 
-        const reordered = [...sections]
-        const [removed] = reordered.splice(oldIndex, 1)
-        reordered.splice(newIndex, 0, removed)
+    // Find the indices of the dragged and target sections
+    const oldIndex = sections.findIndex((s) => s._id.toString() === active.id)
+    const newIndex = sections.findIndex((s) => s._id.toString() === over.id)
 
-        const withNewOrder = reordered.map((section, index) => ({
-          ...section,
-          order: index + 1
-        }))
+    if (oldIndex === -1 || newIndex === -1) return
 
-        const sectionOrders = withNewOrder.map(s => ({
-          id: s._id,
-          order: s.order
-        }))
-        reorderSections({ sectionOrders })
+    // Create a new array with the updated order
+    const reorderedSections = [...sections]
+    const [movedSection] = reorderedSections.splice(oldIndex, 1)
+    reorderedSections.splice(newIndex, 0, movedSection)
 
-        return withNewOrder
-      })
-    }
-  }, [])
+    // Update the coreSectionOrder property for each section
+    const updatedSections = reorderedSections.map((section, index) => ({
+      ...section,
+      coreSectionOrder: index + 1,
+    }))
 
-  const handleSavePlaylist = async (isAutoSave = false) => {
-    if (!playlist) return
+    // Update the state immediately for a responsive UI
+    setSections(updatedSections)
+
+    // Prepare the data for the API call
+    const sectionOrders = updatedSections.map((section) => ({
+      id: section._id,
+      order: section.coreSectionOrder,
+    }))
+
+    reorderSectionsMutation({ sectionOrders })
+  }, [sections])
+
+  const handleSaveCorePlaylist = async (isAutoSave = false) => {
+    if (!corePlaylist) return
 
     // Validate required fields
     if (!title) {
@@ -281,31 +294,31 @@ export default function CorePlaylistEditPage() {
     try {
       if (!isAutoSave) setIsSaving(true)
 
-      await updatePlaylist({
-        id: playlist._id as Id<"corePlaylists">,
+      await updateCorePlaylist({
+        id: corePlaylist._id as Id<"corePlaylists">,
         title,
         description,
-        categoryId: categoryId as Id<"playlistCategories">,
+        categoryId: categoryId as Id<"coreCategories">,
         status
       })
 
-      setIsPlaylistSaved(true)
+      setIsCorePlaylistSaved(true)
 
       if (!isAutoSave) {
-        toast.success("Playlist updated successfully")
+        toast.success("Core corePlaylist updated successfully")
       }
     } catch (error) {
-      console.error("Error updating playlist:", error)
+      console.error("Error updating core playlist:", error)
       if (!isAutoSave) {
-        toast.error("Failed to update playlist")
+        toast.error("Failed to update core playlist")
       }
     } finally {
       if (!isAutoSave) setIsSaving(false)
     }
   }
 
-  const handleDeletePlaylist = async () => {
-    if (!playlist) return
+  const handleDeleteCorePlaylist = async () => {
+    if (!corePlaylist) return
 
     if (deleteConfirmText !== "DELETE") {
       toast.error("Please type DELETE to confirm")
@@ -315,15 +328,15 @@ export default function CorePlaylistEditPage() {
     setIsDeleting(true)
 
     try {
-      await deletePlaylist({
-        id: playlist._id as Id<"corePlaylists">,
+      await deleteCorePlaylistMutation({
+        id: corePlaylist._id as Id<"corePlaylists">,
       })
 
-      toast.success("Playlist deleted successfully")
+      toast.success("Core corePlaylist deleted successfully")
       router.push("/dashboard/core-playlists")
     } catch (error) {
-      console.error("Error deleting playlist:", error)
-      toast.error("Failed to delete playlist")
+      console.error("Error deleting core playlist:", error)
+      toast.error("Failed to delete core playlist")
       setIsDeleting(false)
       setIsDeleteDialogOpen(false)
     }
@@ -334,29 +347,30 @@ export default function CorePlaylistEditPage() {
     type: "base" | "loop"
     maxSelectMedia?: number
   }) => {
-    if (!playlist) return
+    if (!corePlaylist) return
 
     try {
       const highestOrder = sections.length > 0
-        ? Math.max(...sections.map(s => s.order))
+        ? Math.max(...sections.map(s => s.coreSectionOrder))
         : 0
 
-      const newSectionId = await createSection({
-        playlistId: playlist._id as Id<"corePlaylists">,
+      const newSectionId = await createSectionMutation({
+        playlistId: corePlaylist._id as Id<"corePlaylists">,
         title: sectionData.title,
         description: "", // Empty description since it's not needed
         sectionType: sectionData.type,
-        order: highestOrder + 1,
-        maxSelectMedia: sectionData.maxSelectMedia || 0
+        minSelectMedia: 0,
+        maxSelectMedia: sectionData.maxSelectMedia || 10
       })
 
       setSections(prev => [...prev, {
         _id: newSectionId,
         title: sectionData.title,
         description: "", // Empty description since it's not needed
-        type: sectionData.type,
-        order: highestOrder + 1,
-        maxSelectMedia: sectionData.maxSelectMedia
+        sectionType: sectionData.type,
+        coreSectionOrder: highestOrder + 1,
+        minSelectMedia: 0,
+        maxSelectMedia: sectionData.maxSelectMedia || 10,
       }])
 
       setIsAddingSectionOpen(false)
@@ -369,12 +383,13 @@ export default function CorePlaylistEditPage() {
 
   const handleEditSection = async (sectionData: CoreSection) => {
     try {
-      await updateSection({
+      await updateSectionMutation({
         id: sectionData._id,
         title: sectionData.title,
         description: sectionData.description,
-        type: sectionData.type,
-        maxSelectMedia: sectionData.maxSelectMedia
+        sectionType: sectionData.sectionType,
+        minSelectMedia: sectionData.minSelectMedia,
+        maxSelectMedia: sectionData.maxSelectMedia,
       })
 
       setSections(prev => prev.map(s =>
@@ -391,7 +406,7 @@ export default function CorePlaylistEditPage() {
 
   const handleDeleteSection = async (sectionId: Id<"coreSections">) => {
     try {
-      await deleteSection({ id: sectionId })
+      await deleteSectionMutation({ id: sectionId })
 
       setSections(prev => prev.filter(s => s._id !== sectionId))
 
@@ -403,20 +418,33 @@ export default function CorePlaylistEditPage() {
   }
 
   // Handle media playback
-  const handlePlayMedia = (media: MediaItem) => {
-    console.log(' Play button clicked for media:', media.title)
-    setCurrentPlayingMedia(media)
+  const handlePlayMedia = (media: any) => {
+    // Convert to our MediaItem type if needed
+    const mediaItem: MediaItem = {
+      _id: media._id,
+      title: media.title,
+      description: media.description,
+      mediaUrl: media.mediaUrl || media.fileUrl, // Handle both property names
+      duration: media.duration,
+      mediaType: media.mediaType,
+      uploadKey: media.uploadKey,
+      fileSize: media.fileSize,
+      contentType: media.contentType,
+      createdAt: media.createdAt,
+      updatedAt: media.updatedAt,
+      userId: media.userId,
+    }
+    setCurrentPlayingMedia(mediaItem)
     setIsPlayerModalOpen(true)
   }
 
   // Handle player close
   const handleClosePlayer = () => {
-    console.log(' Closing media player')
     setIsPlayerModalOpen(false)
     setCurrentPlayingMedia(null)
   }
 
-  if (!playlist) {
+  if (!corePlaylist) {
     return (
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
@@ -444,7 +472,7 @@ export default function CorePlaylistEditPage() {
             <ArrowLeftIcon className="h-4 w-4" />
             <span className="sr-only">Back</span>
           </Button>
-          <h1 className="text-l font-bold">Edit Core Playlist</h1>
+          <h1 className="text-l font-bold">Edit Core corePlaylist</h1>
         </div>
 
         {/* Delete Button and Dialog */}
@@ -452,21 +480,21 @@ export default function CorePlaylistEditPage() {
           <DialogTrigger asChild>
             <Button
               variant="destructive"
-              disabled={isSaving || isDeleting}
+              disabled={isSaving || !title || !categoryId || isCorePlaylistSaved}
               className="gap-2"
             >
               <Trash2 className="h-4 w-4" />
-              Delete Playlist
+              Delete corePlaylist
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-destructive">
                 <AlertTriangle className="h-5 w-5" />
-                Delete Playlist
+                Delete Core corePlaylist
               </DialogTitle>
               <DialogDescription>
-                This action cannot be undone. This will permanently delete the playlist
+                This action cannot be undone. This will permanently delete the core playlist
                 and all its sections. Media files will not be deleted.
               </DialogDescription>
             </DialogHeader>
@@ -492,7 +520,7 @@ export default function CorePlaylistEditPage() {
               </Button>
               <Button
                 variant="destructive"
-                onClick={handleDeletePlaylist}
+                onClick={handleDeleteCorePlaylist}
                 disabled={deleteConfirmText !== "DELETE" || isDeleting}
               >
                 {isDeleting ? (
@@ -501,7 +529,7 @@ export default function CorePlaylistEditPage() {
                     Deleting...
                   </>
                 ) : (
-                  "Delete Playlist"
+                  "Delete Core corePlaylist"
                 )}
               </Button>
             </DialogFooter>
@@ -519,20 +547,20 @@ export default function CorePlaylistEditPage() {
         )}
 
         <Button
-          onClick={() => handleSavePlaylist(false)}
+          onClick={() => handleSaveCorePlaylist(false)}
           disabled={isSaving}
           className="gap-2"
         >
           <SaveIcon className="h-4 w-4" />
-          {isSaving ? "Saving..." : "Save Playlist"}
+          {isSaving ? "Saving..." : "Save Core corePlaylist"}
         </Button>
 
       </div>
 
-      {/* Playlist metadata */}
+      {/* Core corePlaylist metadata */}
       <Card>
         <CardHeader>
-          <CardTitle>Playlist Details</CardTitle>
+          <CardTitle>corePlaylist Details</CardTitle>
           <CardDescription>Basic information about the playlist</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -562,18 +590,15 @@ export default function CorePlaylistEditPage() {
               <Label htmlFor="category">Category</Label>
               <Select
                 value={categoryId ? categoryId.toString() : ""}
-                onValueChange={(value) => setCategoryId(value as Id<"playlistCategories">)}
+                onValueChange={(value) => setCategoryId(value as Id<"coreCategories">)}
               >
                 <SelectTrigger id="category">
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem
-                      key={category._id.toString()}
-                      value={category._id.toString()}
-                    >
-                      {category.name}
+                  {categories.map((category: any) => (
+                    <SelectItem key={category._id.toString()} value={category._id as Id<"coreCategories">}>
+                      {category.title || category.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -602,13 +627,13 @@ export default function CorePlaylistEditPage() {
       {/* Sections */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Playlist Sections</h2>
+          <h2 className="text-xl font-semibold">corePlaylist Sections</h2>
           <Sheet open={isAddingSectionOpen} onOpenChange={setIsAddingSectionOpen}>
             <SheetTrigger asChild>
               <Button
                 className="gap-2"
-                disabled={!isPlaylistSaved}
-                title={!isPlaylistSaved ? "Save the playlist first before adding sections" : "Add a new section"}
+                disabled={!isCorePlaylistSaved}
+                title={!isCorePlaylistSaved ? "Save the playlist first before adding sections" : "Add a new section"}
               >
                 <PlusIcon className="h-4 w-4" />
                 Add Section
@@ -657,9 +682,9 @@ export default function CorePlaylistEditPage() {
                 </div>
                 <Button
                   className="w-full mt-4"
-                  disabled={!isPlaylistSaved}
+                  disabled={!isCorePlaylistSaved}
                   onClick={() => {
-                    if (!isPlaylistSaved) {
+                    if (!isCorePlaylistSaved) {
                       toast.error("Please save the playlist first before adding sections")
                       return
                     }
@@ -769,8 +794,11 @@ export default function CorePlaylistEditPage() {
               <div className="space-y-2">
                 <Label htmlFor="edit-section-type">Type</Label>
                 <Select
-                  value={editingSection.type}
-                  onValueChange={(value) => setEditingSection({ ...editingSection, type: value as "base" | "loop" })}
+                  value={editingSection.sectionType}
+                  onValueChange={(value) => setEditingSection({
+                    ...editingSection,
+                    sectionType: value as "base" | "loop"
+                  })}
                 >
                   <SelectTrigger id="edit-section-type">
                     <SelectValue placeholder="Select type" />
@@ -786,10 +814,10 @@ export default function CorePlaylistEditPage() {
                 <Input
                   id="edit-section-max-select"
                   type="number"
-                  value={editingSection.maxSelectMedia?.toString() || ""}
+                  value={editingSection.maxSelectMedia || 0}
                   onChange={(e) => setEditingSection({
                     ...editingSection,
-                    maxSelectMedia: e.target.value ? parseInt(e.target.value) : undefined
+                    maxSelectMedia: parseInt(e.target.value) || 0
                   })}
                 />
               </div>
@@ -856,8 +884,8 @@ export default function CorePlaylistEditPage() {
                   // Add each selected media to the section
                   const promises = Array.from(selectedMediaIds).map(mediaId => {
                     return addMedia({
-                      coreSectionId: currentSectionId,
-                      mediaId: mediaId as Id<"media">,
+                      sectionId: currentSectionId,
+                      mediaId: mediaId as Id<"medias">,
                       selectMedia: true // Select by default when adding
                     })
                   })

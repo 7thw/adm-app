@@ -2,21 +2,21 @@
 
 import { useUser } from '@clerk/nextjs'
 import { useConvexAuth } from 'convex/react'
-import { useMutation } from 'convex/react'
+import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { useEffect } from 'react'
 
+/**
+ * Custom hook for authentication state management
+ * Combines Clerk and Convex auth states
+ * User data is synced from Clerk to Convex via webhooks
+ */
 export function useAuth() {
   const { isLoaded: clerkLoaded, isSignedIn, user } = useUser()
   const { isLoading: convexLoading, isAuthenticated } = useConvexAuth()
-  const storeUser = useMutation(api.users.store)
-
-  // Store user in Convex when authenticated
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      storeUser().catch(console.error)
-    }
-  }, [isAuthenticated, user, storeUser])
+  
+  // User data is synchronized through Clerk webhooks to Convex
+  // We don't need to explicitly sync on client-side anymore
 
   return {
     isLoading: !clerkLoaded || convexLoading,

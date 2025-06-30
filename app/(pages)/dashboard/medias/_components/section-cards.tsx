@@ -14,8 +14,8 @@ import {
 export function SectionCards() {
   const { isSignedIn } = useUser()
 
-  // Get media data using simplified query (now returns array directly)
-  const mediaData = useQuery(api.media.getAllMedia, isSignedIn ? {} : "skip");
+  // Get media data using admin API
+  const mediaData = useQuery(api.admin.listMedias, isSignedIn ? {} : "skip");
 
   // Calculate counts - mediaData is now a simple array
   const audioCount = mediaData?.filter(media => media.mediaType === 'audio').length || 0;

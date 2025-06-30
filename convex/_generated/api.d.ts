@@ -8,20 +8,14 @@
  * @module
  */
 
-import type * as adminSetup from "../adminSetup.js";
-import type * as adminUsers from "../adminUsers.js";
+import type * as admin from "../admin.js";
 import type * as auth from "../auth.js";
-import type * as authClerk from "../authClerk.js";
-import type * as clearDatabase from "../clearDatabase.js";
-import type * as corePlaylists from "../corePlaylists.js";
-import type * as coreSectionMedia from "../coreSectionMedia.js";
-import type * as coreSections from "../coreSections.js";
-import type * as media from "../media.js";
-import type * as messages from "../messages.js";
-import type * as playlistCategories from "../playlistCategories.js";
-import type * as playlistCategoriesSetup from "../playlistCategoriesSetup.js";
-import type * as r2Upload from "../r2Upload.js";
-import type * as subscriberUsers from "../subscriberUsers.js";
+import type * as http from "../http.js";
+import type * as internal_auth from "../internal/auth.js";
+import type * as internal_webhooks from "../internal/webhooks.js";
+import type * as router from "../router.js";
+import type * as subscribers from "../subscribers.js";
+import type * as webhooks from "../webhooks.js";
 
 import type {
   ApiFromModules,
@@ -38,20 +32,14 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  adminSetup: typeof adminSetup;
-  adminUsers: typeof adminUsers;
+  admin: typeof admin;
   auth: typeof auth;
-  authClerk: typeof authClerk;
-  clearDatabase: typeof clearDatabase;
-  corePlaylists: typeof corePlaylists;
-  coreSectionMedia: typeof coreSectionMedia;
-  coreSections: typeof coreSections;
-  media: typeof media;
-  messages: typeof messages;
-  playlistCategories: typeof playlistCategories;
-  playlistCategoriesSetup: typeof playlistCategoriesSetup;
-  r2Upload: typeof r2Upload;
-  subscriberUsers: typeof subscriberUsers;
+  http: typeof http;
+  "internal/auth": typeof internal_auth;
+  "internal/webhooks": typeof internal_webhooks;
+  router: typeof router;
+  subscribers: typeof subscribers;
+  webhooks: typeof webhooks;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 
@@ -186,6 +174,62 @@ export declare const components: {
           size?: number;
         },
         { isNew: boolean }
+      >;
+    };
+  };
+  resend: {
+    lib: {
+      cancelEmail: FunctionReference<
+        "mutation",
+        "internal",
+        { emailId: string },
+        null
+      >;
+      get: FunctionReference<"query", "internal", { emailId: string }, any>;
+      getStatus: FunctionReference<
+        "query",
+        "internal",
+        { emailId: string },
+        {
+          complained: boolean;
+          errorMessage: string | null;
+          opened: boolean;
+          status:
+            | "waiting"
+            | "queued"
+            | "cancelled"
+            | "sent"
+            | "delivered"
+            | "delivery_delayed"
+            | "bounced";
+        }
+      >;
+      handleEmailEvent: FunctionReference<
+        "mutation",
+        "internal",
+        { event: any },
+        null
+      >;
+      sendEmail: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          from: string;
+          headers?: Array<{ name: string; value: string }>;
+          html?: string;
+          options: {
+            apiKey: string;
+            initialBackoffMs: number;
+            onEmailEvent?: { fnHandle: string };
+            retryAttempts: number;
+            testMode: boolean;
+          };
+          replyTo?: Array<string>;
+          subject: string;
+          text?: string;
+          to: string;
+        },
+        string
       >;
     };
   };

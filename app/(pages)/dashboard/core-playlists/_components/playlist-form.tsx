@@ -1,18 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 import { useUser } from "@clerk/nextjs"
 import { useMutation, useQuery } from "convex/react"
 import { SaveIcon } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
 
@@ -21,7 +21,7 @@ interface PlaylistFormProps {
     _id?: Id<"corePlaylists">
     title?: string
     description?: string
-    categoryId?: Id<"playlistCategories">
+    categoryId?: Id<"coreCategories">
     status?: "draft" | "published"
   }
   onSuccess?: (playlistId: Id<"corePlaylists">) => void
@@ -29,113 +29,71 @@ interface PlaylistFormProps {
   isEdit?: boolean
 }
 
-export function PlaylistForm({ 
-  initialData, 
-  onSuccess, 
-  submitLabel = "Create Playlist",
+export function PlaylistForm({
+  initialData,
+  onSuccess,
+  submitLabel = "Create corePlaylist",
   isEdit = false
 }: PlaylistFormProps) {
   const router = useRouter()
   const { user } = useUser()
-  
+
   const [title, setTitle] = useState(initialData?.title || "")
   const [description, setDescription] = useState(initialData?.description || "")
-  const [categoryId, setCategoryId] = useState<Id<"playlistCategories"> | "">(initialData?.categoryId || "")
+  const [categoryId, setCategoryId] = useState<Id<"coreCategories"> | "">(initialData?.categoryId || "")
   const [status, setStatus] = useState<"draft" | "published">(initialData?.status || "draft")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
+
   // Get categories for dropdown
-  const categories = useQuery(api.playlistCategories.getAll) || []
-  
+  const categories = useQuery(api.admin.listCoreCategories, { includeInactive: false }) || []
+
   // Convex mutations
   const createPlaylist = useMutation(api.corePlaylists.create)
   const updatePlaylist = useMutation(api.corePlaylists.update)
-  const createUser = useMutation(api.users.createUser)
-  const getUserByClerkId = useQuery(api.users.getUserByClerkId, 
-    user ? { clerkId: user.id } : "skip"
-  )
-  
-  // Helper function to ensure the user exists in Convex
-  const ensureUserExists = async (): Promise<Id<"users"> | null> => {
-    if (!user) return null
-    
-    // Check if user already exists in Convex
-    if (getUserByClerkId) {
-      return getUserByClerkId._id
-    }
-    
-    // Create the user if they don't exist
-    try {
-      const userId = await createUser({
-        name: user.fullName || "",
-        email: user.primaryEmailAddress?.emailAddress || "",
-        image: user.imageUrl,
-        clerkId: user.id
-      })
-      return userId
-    } catch (error) {
-      console.error("Error creating user:", error)
-      return null
-    }
-  }
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!title.trim()) {
       toast.error("Title is required")
       return
     }
-    
+
     if (!categoryId) {
       toast.error("Category is required")
       return
     }
-    
+
     try {
       setIsSubmitting(true)
-      
-      // Get the user ID from Clerk
-      if (!user) {
-        toast.error("You must be logged in to create a playlist")
-        return
-      }
-      
-      // Find or create the user in Convex
-      const userId = await ensureUserExists()
-      if (!userId) {
-        toast.error("Failed to get user information")
-        return
-      }
-      
+
       let playlistId: Id<"corePlaylists">
-      
+
       if (isEdit && initialData?._id) {
         // Update existing playlist
         playlistId = await updatePlaylist({
           id: initialData._id,
           title,
           description: description || "",
-          categoryId: categoryId as Id<"playlistCategories">,
+          categoryId: categoryId as unknown as Id<"coreCategories">,
           status
         })
-        toast.success("Playlist updated successfully")
+        toast.success("corePlaylist updated successfully")
       } else {
         // Create new playlist
         playlistId = await createPlaylist({
           title,
           description: description || "",
-          categoryId: categoryId as Id<"playlistCategories">,
+          categoryId: categoryId as unknown as Id<"coreCategories">,
           status,
-          userId: userId as Id<"users">
         })
-        toast.success("Playlist created successfully")
+        toast.success("corePlaylist created successfully")
       }
-      
+
       if (onSuccess) {
         onSuccess(playlistId)
       }
-      
+
     } catch (error) {
       console.error("Error saving playlist:", error)
       toast.error(isEdit ? "Failed to update playlist" : "Failed to create playlist")
@@ -143,14 +101,14 @@ export function PlaylistForm({
       setIsSubmitting(false)
     }
   }
-  
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{isEdit ? "Edit Playlist" : "Playlist Details"}</CardTitle>
+        <CardTitle>{isEdit ? "Edit corePlaylist" : "corePlaylist Details"}</CardTitle>
         <CardDescription>
-          {isEdit 
-            ? "Update the information for this playlist" 
+          {isEdit
+            ? "Update the information for this playlist"
             : "Enter the basic information for your new playlist"}
         </CardDescription>
       </CardHeader>
@@ -166,7 +124,7 @@ export function PlaylistForm({
               required
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
@@ -177,20 +135,20 @@ export function PlaylistForm({
               rows={3}
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
             <Select
               value={categoryId ? categoryId.toString() : ""}
-              onValueChange={(value) => setCategoryId(value as Id<"playlistCategories">)}
+              onValueChange={(value) => setCategoryId(value as unknown as Id<"coreCategories">)}
             >
               <SelectTrigger id="category">
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
                 {categories.map((category) => (
-                  <SelectItem 
-                    key={category._id.toString()} 
+                  <SelectItem
+                    key={category._id.toString()}
                     value={category._id.toString()}
                   >
                     {category.name}
@@ -199,7 +157,7 @@ export function PlaylistForm({
               </SelectContent>
             </Select>
           </div>
-          
+
           {isEdit && (
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
@@ -218,10 +176,10 @@ export function PlaylistForm({
             </div>
           )}
         </CardContent>
-        
+
         <CardFooter>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="gap-2"
             disabled={isSubmitting || !title || !categoryId}
           >

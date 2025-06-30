@@ -1,21 +1,21 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { ArrowLeftIcon } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
-import { PlaylistForm } from "../_components/playlist-form"
 import { Id } from "@/convex/_generated/dataModel"
+import { PlaylistForm } from "../_components/playlist-form"
 
 export default function NewCorePlaylistPage() {
   const router = useRouter()
-  
+
   const handleSuccess = (playlistId: Id<"corePlaylists">) => {
     // Redirect to the edit page immediately after successful creation
     router.push(`/dashboard/core-playlists/${playlistId}/edit`)
   }
-  
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -26,13 +26,13 @@ export default function NewCorePlaylistPage() {
               <span className="sr-only">Back</span>
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold">Create New Core Playlist</h1>
+          <h1 className="text-2xl font-bold">Create New Core corePlaylist</h1>
         </div>
       </div>
-      
-      <PlaylistForm 
-        onSuccess={handleSuccess} 
-        submitLabel="Create Playlist"
+
+      <PlaylistForm
+        onSuccess={handleSuccess}
+        submitLabel="Create corePlaylist"
       />
     </div>
   )

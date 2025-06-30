@@ -11,7 +11,8 @@ import {
   IconDotsVertical,
   IconLayoutColumns,
   IconPlayerPlayFilled,
-  IconPlus
+  IconPlus,
+  IconTrashFilled
 } from "@tabler/icons-react"
 import {
   ColumnDef,
@@ -95,18 +96,23 @@ import FormMedia from "./FormMedia"
 export const schema = z.object({
   _id: z.any(), // Convex ID
   title: z.string(),
-  mediaType: z.string(),
-  mediaUrl: z.string(),
-  duration: z.number(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
   description: z.string().optional(),
-  thumbnailUrl: z.string().optional(),
+  mediaType: z.enum(["audio", "video"]), // Constrained to exact schema options
+  storageId: z.string().optional(), // Convex _storage ID
+  embedUrl: z.string().optional(), // For video embeds
+  youtubeId: z.string().optional(), // For YouTube videos
+  duration: z.number(), // in seconds
   fileSize: z.number().optional(),
   contentType: z.string().optional(),
-  uploadKey: z.string().optional(),
-  userId: z.string().optional(),
-  uploadStatus: z.string().optional(),
+  thumbnailStorageId: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
+  processingStatus: z.enum(["pending", "processing", "completed", "failed"]).optional(),
+  transcript: z.string().optional(),
+  waveformData: z.string().optional(),
+  quality: z.string().optional(),
+  bitrate: z.number().optional(),
+  uploadedBy: z.string(), // User ID
+  isPublic: z.boolean().optional(),
   _creationTime: z.number().optional(),
 })
 
@@ -191,34 +197,56 @@ export const columns: ColumnDef<z.infer<typeof schema>>[] = [
     id: "play",
     header: "",
     cell: ({ row }) => {
-      const media = row.original;
+      // Access the media data for the current row
+      const media = row.original
+      const [openPlayer, setOpenPlayer] = React.useState(false)
+      const [isClient, setIsClient] = React.useState(false)
 
-      // Try to determine the actual media URL
-      let actualMediaUrl = media.mediaUrl;
+      React.useEffect(() => {
+        setIsClient(true)
+      }, [])
 
-      // If mediaUrl is empty but we have an uploadKey, try to construct the URL
-      if ((!actualMediaUrl || actualMediaUrl.trim() === "") && media.uploadKey) {
-        // Check if it's a UUID (R2 generated key) or custom key
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(media.uploadKey);
-        // Use R2 custom domain URL regardless of UUID or not
-        actualMediaUrl = `https://r2-realigna.7thw.co/${media.uploadKey}`;
+      // Helper function to get the media URL
+      const getMediaUrl = () => {
+        // Use storageId to generate URL or use embedUrl if available
+        if (media.storageId) {
+          return `/api/media/${media.storageId}`
+        } else if (media.embedUrl) {
+          return media.embedUrl
+        } else if (media.youtubeId) {
+          return `https://www.youtube.com/watch?v=${media.youtubeId}`
+        }
+        return ""
       }
 
-      // Ensure URL is properly formed
-      if (actualMediaUrl && !actualMediaUrl.startsWith('http')) {
-        actualMediaUrl = `https://${actualMediaUrl}`;
-      }
-      
-      // Debug the URL to help troubleshoot
-      if (actualMediaUrl) {
-        console.log(`Media URL for ${media.title}:`, actualMediaUrl);
-      } else {
-        console.warn(`No URL found for media ${media.title}`);
+      // Helper function to determine if media is playable
+      const isPlayable = () => {
+        return media.mediaType === "audio" && (media.storageId || media.embedUrl || media.youtubeId)
       }
 
-      const hasValidUrl = actualMediaUrl && actualMediaUrl.trim() !== "";
+      // Helper function to determine media source type
+      const getMediaSourceType = () => {
+        if (media.storageId) return "storage"
+        if (media.embedUrl) return "embed"
+        if (media.youtubeId) return "youtube"
+        return "unknown"
+      }
 
-      if (!hasValidUrl) {
+      // Get the media URL using our helper function
+      const mediaUrl = getMediaUrl();
+
+      // Media URL checking
+      const hasUrl = mediaUrl && mediaUrl !== "" && mediaUrl !== "undefined";
+      const isAudio = media.mediaType === "audio";
+      const playerType = isAudio ? "audio" : "video";
+      const canPlay = hasUrl && media.mediaType;
+
+      // Function to open the player dialog
+      const openMediaPlayer = () => {
+        if (canPlay) setOpenPlayer(true);
+      };
+
+      if (!canPlay) {
         return (
           <Button
             variant="ghost"
@@ -234,11 +262,12 @@ export const columns: ColumnDef<z.infer<typeof schema>>[] = [
       }
 
       return (
-        <Dialog>
+        <Dialog open={openPlayer && isClient} onOpenChange={setOpenPlayer}>
           <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={openMediaPlayer}
               className="text-muted-foreground hover:text-primary"
               title={`Play ${media.title}`}
             >
@@ -252,9 +281,9 @@ export const columns: ColumnDef<z.infer<typeof schema>>[] = [
             </DialogHeader>
             <MediaPlayer
               className="flex-1 w-[100%]"
-              src={actualMediaUrl}
+              src={mediaUrl}
               title={media.title}
-              description={media.description}
+              description={media.description || ""}
               onError={(error) => {
                 console.error("Media playback error:", error);
                 toast.error(`Playback failed: ${error}`);
@@ -263,11 +292,10 @@ export const columns: ColumnDef<z.infer<typeof schema>>[] = [
             <div className="flex-1">
               <MediaInfo
                 media={media}
-                url={actualMediaUrl}
-                showDebugInfo={true}
+                url={mediaUrl}
+                showDebugInfo={false}
               />
             </div>
-
           </DialogContent>
         </Dialog>
       );
@@ -276,44 +304,29 @@ export const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     id: "actions",
     cell: ({ row }) => {
-      // Get the delete media mutation from Convex
-      const deleteMediaMutation = useMutation(api.media.deleteMedia);
+      // TODO: Implement deleteMedia function in Convex backend
+      // const deleteMediaMutation = useMutation(api.admin.deleteMedia);
 
       const handleDelete = async () => {
-        if (window.confirm(`Are you sure you want to delete ${row.original.title}?`)) {
-          try {
-            await deleteMediaMutation({ id: row.original._id });
-            toast.success("Media deleted successfully");
-            // You might want to refresh the data here
-          } catch (error: any) {
-            toast.error(`Failed to delete media: ${error.message}`);
-          }
-        }
+        toast.warning("Delete functionality is currently unavailable - backend endpoint needs to be implemented.");
+        console.warn("deleteMedia endpoint not implemented in Convex backend");
+        // Endpoint would be called like this once implemented:
+        // await deleteMediaMutation({ mediaId: row.original._id });
       };
 
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="h-8 w-8 p-0"
-              size="icon"
-            >
-              <IconDotsVertical />
-              <span className="sr-only">Open menu</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-32">
-            <DropdownMenuItem>Edit</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={handleDelete}
-            >
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleDelete}
+            className="text-muted-foreground opacity-50" // Visually indicate disabled state
+            title="Delete media (currently unavailable)"
+          >
+            <IconTrashFilled className="h-4 w-4" />
+            <span className="sr-only">Delete {row.original.title}</span>
+          </Button>
+        </div>
       );
     },
   },
@@ -339,7 +352,8 @@ export function DataTable({
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [activeFilter, setActiveFilter] = React.useState<"all" | "audio" | "video">("all")
   const [data, setData] = React.useState<z.infer<typeof schema>[]>(initialData)
-  const deleteMediaMutation = useMutation(api.media.deleteMedia);
+  // TODO: Implement deleteMedia function in Convex backend
+  // const deleteMediaMutation = useMutation(api.admin.deleteMedia);
 
   // Update data when initialData changes or filter changes
   React.useEffect(() => {
@@ -949,19 +963,45 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
               />
             </div>
             <div className="flex flex-col gap-3">
-              <Label htmlFor="mediaUrl">Media URL</Label>
-              <Input
-                id="mediaUrl"
-                defaultValue={item.mediaUrl}
-                readOnly
-              />
+              <Label htmlFor="mediaSource">Media Source</Label>
+              {item.storageId && (
+                <div className="flex flex-col gap-2">
+                  <Badge variant="outline">Storage ID</Badge>
+                  <Input
+                    id="storageId"
+                    defaultValue={item.storageId}
+                    readOnly
+                  />
+                </div>
+              )}
+              {item.embedUrl && (
+                <div className="flex flex-col gap-2">
+                  <Badge variant="outline">External Embed URL</Badge>
+                  <Input
+                    id="embedUrl"
+                    defaultValue={item.embedUrl}
+                    readOnly
+                  />
+                </div>
+              )}
+              {item.youtubeId && (
+                <div className="flex flex-col gap-2">
+                  <Badge variant="outline">YouTube ID</Badge>
+                  <Input
+                    id="youtubeId"
+                    defaultValue={item.youtubeId}
+                    readOnly
+                  />
+                </div>
+              )}
             </div>
-            {item.thumbnailUrl && (
+            {item.thumbnailStorageId && (
               <div className="flex flex-col gap-3">
-                <Label htmlFor="thumbnailUrl">Thumbnail URL</Label>
+                <Label htmlFor="thumbnailStorageId">Thumbnail Storage ID</Label>
                 <Input
-                  id="thumbnailUrl"
-                  defaultValue={item.thumbnailUrl}
+                  id="thumbnailStorageId"
+                  defaultValue={item.thumbnailStorageId}
+                  readOnly
                 />
               </div>
             )}

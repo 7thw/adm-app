@@ -1,261 +1,371 @@
-// convex/schema.ts
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
 
-export default defineSchema({
-  // Users (managed by Clerk)
-  subscriberUsers: defineTable({
-    clerkId: v.string(),
+const applicationTables = {
+  // =================================================================
+  // USER ROLES & ORGANIZATION MANAGEMENT
+  // =================================================================
+  
+  // Organization roles for admin access control
+  organizationRoles: defineTable({
+    userId: v.id("users"),
+    organizationId: v.string(), // Clerk organization ID
+    role: v.union(v.literal("admin"), v.literal("member")),
+    permissions: v.array(v.string()),
+    isActive: v.boolean(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_organization", ["organizationId"])
+    .index("by_user_organization", ["userId", "organizationId"])
+    .index("by_role", ["role"]),
+
+  // User profiles with Clerk sync data
+  userProfiles: defineTable({
+    userId: v.id("users"), // References auth users table
+    clerkUserId: v.string(), // Clerk user ID for sync
     email: v.string(),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
-    tokenIdentifier: v.string(), // Add tokenIdentifier for Clerk auth
-    name: v.optional(v.string()), // Add name field for user's display name
     role: v.union(v.literal("admin"), v.literal("subscriber")),
     subscriptionStatus: v.union(
       v.literal("active"),
       v.literal("inactive"),
-      v.literal("cancelled"),
+      v.literal("canceled"),
       v.literal("past_due")
     ),
+    subscriptionId: v.optional(v.string()), // Clerk/Stripe subscription ID
     subscriptionPlan: v.optional(v.string()),
-    subscriptionExpires: v.optional(v.number()),
-    metadata: v.optional(v.any()),
-    lastLogin: v.optional(v.number()), // Add lastLogin field
-    createdAt: v.number(),
-    updatedAt: v.number(),
+    subscriptionExpiresAt: v.optional(v.number()),
+    lastActiveAt: v.number(),
+    isActive: v.boolean(),
   })
-    .index("by_clerk_id", ["clerkId"])
+    .index("by_user", ["userId"])
+    .index("by_clerk_user_id", ["clerkUserId"])
     .index("by_email", ["email"])
     .index("by_role", ["role"])
-    .index("by_token", ["tokenIdentifier"]) // Add index for tokenIdentifier
-    .index("by_subscription_status", ["subscriptionStatus"]),
+    .index("by_subscription_status", ["subscriptionStatus"])
+    .index("by_active_subscribers", ["role", "subscriptionStatus", "isActive"]),
 
-  adminUsers: defineTable({
-    clerkId: v.string(),
-    email: v.string(),
-    firstName: v.optional(v.string()),
-    lastName: v.optional(v.string()),
-    imageUrl: v.optional(v.string()),
-    tokenIdentifier: v.string(), // Add tokenIdentifier for Clerk auth
-    name: v.optional(v.string()), // Add name field for user's display name
-    role: v.union(v.literal("admin"), v.literal("subscriber")),
-    subscriptionStatus: v.union(
-      v.literal("active"),
-      v.literal("inactive"),
-      v.literal("cancelled"),
-      v.literal("past_due")
-    ),
-    subscriptionPlan: v.optional(v.string()),
-    subscriptionExpires: v.optional(v.number()),
-    metadata: v.optional(v.any()),
-    lastLogin: v.optional(v.number()), // Add lastLogin field
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_clerk_id", ["clerkId"])
-    .index("by_email", ["email"])
-    .index("by_role", ["role"])
-    .index("by_token", ["tokenIdentifier"]) // Add index for tokenIdentifier
-    .index("by_subscription_status", ["subscriptionStatus"]),
+  // =================================================================
+  // CORE CONTENT MANAGEMENT (Admin App Only)
+  // =================================================================
 
-  // Messages
-  messages: defineTable({
-    user: v.string(),
-    message: v.string(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_user", ["user"]),
-
-  // Playlist Categories (for tagging)
-  playlistCategories: defineTable({
+  // Content categories
+  coreCategories: defineTable({
     name: v.string(),
     description: v.optional(v.string()),
+    slug: v.string(),
     isActive: v.boolean(),
     order: v.number(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
+    color: v.optional(v.string()),
+    iconUrl: v.optional(v.string()),
+    createdBy: v.id("users"),
   })
+    .index("by_active", ["isActive"])
     .index("by_order", ["order"])
-    .index("by_active", ["isActive"]),
+    .index("by_slug", ["slug"])
+    .index("by_active_order", ["isActive", "order"]),
 
-  // Media (uploaded/embedded content)
-  media: defineTable({
+  // Media files with proper file storage integration
+  medias: defineTable({
     title: v.string(),
     description: v.optional(v.string()),
     mediaType: v.union(v.literal("audio"), v.literal("video")),
-    mediaUrl: v.string(), // CloudFlare R2 URL for audio, YouTube URL for video
+    // For audio files uploaded to Convex storage
+    storageId: v.optional(v.id("_storage")),
+    // For video embeds (YouTube, etc.)
+    embedUrl: v.optional(v.string()),
+    youtubeId: v.optional(v.string()),
+    // Media metadata
+    duration: v.number(), // in seconds
+    fileSize: v.optional(v.number()),
+    contentType: v.optional(v.string()),
+    thumbnailStorageId: v.optional(v.id("_storage")),
     thumbnailUrl: v.optional(v.string()),
-    duration: v.optional(v.number()), // in seconds
-    fileSize: v.optional(v.number()), // in bytes, for audio files
-    uploadKey: v.optional(v.string()), // R2 key for audio files
-    contentType: v.optional(v.string()), // MIME type of the file
-    userId: v.optional(v.string()), // User who uploaded the file
-    uploadStatus: v.optional(v.union(
+    // Processing status
+    processingStatus: v.union(
       v.literal("pending"),
+      v.literal("processing"),
       v.literal("completed"),
       v.literal("failed")
-    )),
-    createdAt: v.number(),
-    updatedAt: v.number(),
+    ),
+    // Audio-specific metadata
+    transcript: v.optional(v.string()),
+    waveformData: v.optional(v.string()),
+    quality: v.optional(v.string()),
+    bitrate: v.optional(v.number()),
+    // Ownership and access
+    uploadedBy: v.id("users"),
+    isPublic: v.boolean(),
   })
     .index("by_type", ["mediaType"])
-    .index("by_upload_status", ["uploadStatus"])
-    .index("by_created", ["createdAt"]),
+    .index("by_status", ["processingStatus"])
+    .index("by_uploader", ["uploadedBy"])
+    .index("by_public", ["isPublic"])
+    .index("by_type_public", ["mediaType", "isPublic"]),
 
-  // CorePlaylists
+  // Media tags for better organization
+  mediaTags: defineTable({
+    mediaId: v.id("medias"),
+    tag: v.string(),
+  })
+    .index("by_media", ["mediaId"])
+    .index("by_tag", ["tag"]),
+
+  // Core playlists (admin-managed templates)
   corePlaylists: defineTable({
     title: v.string(),
     description: v.optional(v.string()),
-    thumbnailUrl: v.optional(v.string()),
+    thumbnailStorageId: v.optional(v.id("_storage")),
     status: v.union(v.literal("draft"), v.literal("published")),
-    categoryId: v.id("playlistCategories"),
-    totalDuration: v.optional(v.number()), // calculated total duration
+    categoryId: v.id("coreCategories"),
+    difficulty: v.optional(v.union(
+      v.literal("beginner"),
+      v.literal("intermediate"),
+      v.literal("advanced")
+    )),
+    estimatedDuration: v.optional(v.number()), // in minutes
     playCount: v.number(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
+    averageRating: v.optional(v.number()),
+    createdBy: v.id("users"),
+    publishedAt: v.optional(v.number()),
+    lastModifiedAt: v.number(),
   })
     .index("by_status", ["status"])
     .index("by_category", ["categoryId"])
-    .index("by_published", ["status", "createdAt"])
-    .index("by_play_count", ["playCount"]),
+    .index("by_category_status", ["categoryId", "status"])
+    .index("by_published", ["status", "publishedAt"])
+    .index("by_creator", ["createdBy"]),
 
-  // CoreSections
+  // Sections within core playlists
   coreSections: defineTable({
     playlistId: v.id("corePlaylists"),
     title: v.string(),
     description: v.optional(v.string()),
     sectionType: v.union(v.literal("base"), v.literal("loop")),
-    minSelectMedia: v.number(), // minimum medias subscribers must toggle on
-    maxSelectMedia: v.number(), // maximum medias subscribers can toggle on
+    minSelectMedia: v.number(),
+    maxSelectMedia: v.number(),
     order: v.number(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
+    isRequired: v.boolean(),
+    estimatedDuration: v.optional(v.number()),
   })
     .index("by_playlist", ["playlistId"])
-    .index("by_playlist_order", ["playlistId", "order"]),
+    .index("by_playlist_order", ["playlistId", "order"])
+    .index("by_type", ["sectionType"]),
 
-  // SectionMedia (linking media to sections)
-  sectionMedia: defineTable({
+  // Media items within sections
+  sectionMedias: defineTable({
     sectionId: v.id("coreSections"),
-    mediaId: v.id("media"),
+    mediaId: v.id("medias"),
     order: v.number(),
-    isRequired: v.optional(v.boolean()), // if true, this media is always selected
-    createdAt: v.number(),
+    isOptional: v.boolean(),
+    defaultSelected: v.boolean(),
   })
     .index("by_section", ["sectionId"])
     .index("by_section_order", ["sectionId", "order"])
     .index("by_media", ["mediaId"]),
 
-  // SubscriberPlaylists (customized playlists by subscribers)
-  subscriberPlaylists: defineTable({
-    userId: v.string(), // Clerk user id
+  // =================================================================
+  // USER CUSTOMIZATION & EXPERIENCE (PWA App)
+  // =================================================================
+
+  // User's customized playlists
+  userPlaylists: defineTable({
+    userId: v.id("users"),
     corePlaylistId: v.id("corePlaylists"),
-    title: v.string(), // custom title by subscriber
-    customSettings: v.optional(v.string()), // JSON string of custom settings
-    lastPlayed: v.optional(v.number()),
-    playCount: v.number(),
+    title: v.string(),
+    customizations: v.string(), // JSON string of user selections
     isActive: v.boolean(),
+    isFavorite: v.boolean(),
+    playCount: v.number(),
+    lastPlayedAt: v.optional(v.number()),
+    completionPercentage: v.optional(v.number()),
+    totalTimeSpent: v.optional(v.number()), // in seconds
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
     .index("by_user_active", ["userId", "isActive"])
+    .index("by_user_favorites", ["userId", "isFavorite"])
     .index("by_core_playlist", ["corePlaylistId"])
-    .index("by_last_played", ["lastPlayed"]),
+    .index("by_last_played", ["userId", "lastPlayedAt"]),
 
-  // SubscriberMediaSelection (tracks which media subscriber selected per section)
-  subscriberMediaSelections: defineTable({
-    subscriberPlaylistId: v.id("subscriberPlaylists"),
+  // User media selections and progress
+  userMediaSelections: defineTable({
+    userPlaylistId: v.id("userPlaylists"),
     sectionId: v.id("coreSections"),
-    mediaId: v.id("media"),
+    mediaId: v.id("medias"),
     isSelected: v.boolean(),
-    playOrder: v.optional(v.number()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
+    playOrder: v.number(),
+    completedAt: v.optional(v.number()),
+    timeSpent: v.optional(v.number()), // in seconds
+    lastPosition: v.optional(v.number()), // playback position in seconds
   })
-    .index("by_subscriber_playlist", ["subscriberPlaylistId"])
+    .index("by_user_playlist", ["userPlaylistId"])
     .index("by_section", ["sectionId"])
     .index("by_media", ["mediaId"])
-    .index("by_selection", ["subscriberPlaylistId", "sectionId", "isSelected"]),
+    .index("by_selected", ["isSelected"])
+    .index("by_user_playlist_selected", ["userPlaylistId", "isSelected"]),
 
-  // UserPlayerSettings
+  // User player settings
   userPlayerSettings: defineTable({
-    userId: v.string(), // Clerk user id
-    playerSettings: v.object({
-      maxLoop: v.number(), // 0, 1, 2, 3, or -1 for infinite
-      countDownTimer: v.number(), // minutes
-      volume: v.number(), // 0-100
-      autoplay: v.optional(v.boolean()),
-      shuffle: v.optional(v.boolean()),
-    }),
-    currentPlaylistId: v.optional(v.id("subscriberPlaylists")),
-    currentMediaId: v.optional(v.id("media")),
-    currentTime: v.number(), // current playback time in seconds
-    lastActivity: v.number(), // timestamp of last activity
-    createdAt: v.number(),
+    userId: v.id("users"),
+    // Player preferences
+    maxLoop: v.number(), // 0 = no loop, -1 = infinite
+    countDownTimer: v.number(), // in minutes
+    volume: v.number(), // 0-100
+    playbackSpeed: v.number(), // 0.5-2.0
+    autoPlay: v.boolean(),
+    shuffleMode: v.boolean(),
+    backgroundPlayback: v.boolean(),
+    // Current session state
+    currentPlaylistId: v.optional(v.id("userPlaylists")),
+    currentMediaId: v.optional(v.id("medias")),
+    currentPosition: v.number(), // in seconds
+    // Offline settings
+    downloadQuality: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+    wifiOnlyDownload: v.boolean(),
+    autoSync: v.boolean(),
     updatedAt: v.number(),
   })
-    .index("by_user", ["userId"])
-    .index("by_last_activity", ["lastActivity"]),
+    .index("by_user", ["userId"]),
 
-  // SubscriberSettings (for PWA offline storage reference)
-  subscriberSettings: defineTable({
-    userId: v.string(), // Clerk user id
-    preferences: v.object({
-      autoSync: v.boolean(),
-      offlineMode: v.boolean(),
-      downloadQuality: v.optional(v.union(
-        v.literal("low"),
-        v.literal("medium"),
-        v.literal("high")
-      )),
-      maxStorageSize: v.optional(v.number()), // MB
-    }),
-    offlineData: v.optional(v.string()), // JSON string of offline cached playlists
-    lastSync: v.optional(v.number()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
+  // =================================================================
+  // SUBSCRIPTION & BILLING INTEGRATION
+  // =================================================================
+
+  // Subscription usage tracking
+  subscriptionUsage: defineTable({
+    userId: v.id("users"),
+    period: v.string(), // "2024-01" format
+    playlistsCreated: v.number(),
+    mediaPlayed: v.number(),
+    totalPlayTime: v.number(), // in seconds
+    downloadsUsed: v.number(),
+    featuresUsed: v.array(v.string()),
+    lastUpdated: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_last_sync", ["lastSync"]),
+    .index("by_period", ["period"])
+    .index("by_user_period", ["userId", "period"]),
 
-  // Analytics and Tracking
-  playHistory: defineTable({
-    userId: v.string(),
-    mediaId: v.id("media"),
-    playlistId: v.optional(v.id("subscriberPlaylists")),
-    duration: v.number(), // how long they listened
-    completionRate: v.number(), // percentage completed (0-100)
+  // Webhook events from Clerk/Stripe
+  webhookEvents: defineTable({
+    eventId: v.string(), // Unique event ID from webhook
+    eventType: v.string(), // e.g., "user.created", "subscription.updated"
+    source: v.union(v.literal("clerk"), v.literal("stripe")),
+    data: v.string(), // JSON string of event data
+    processed: v.boolean(),
+    processedAt: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+    retryCount: v.number(),
+  })
+    .index("by_event_id", ["eventId"])
+    .index("by_type", ["eventType"])
+    .index("by_source", ["source"])
+    .index("by_processed", ["processed"])
+    .index("by_source_processed", ["source", "processed"]),
+
+  // =================================================================
+  // ANALYTICS & TRACKING
+  // =================================================================
+
+  // User activity events
+  analyticsEvents: defineTable({
+    userId: v.id("users"),
+    eventType: v.string(), // "playlist_created", "media_played", etc.
+    eventData: v.optional(v.string()), // JSON string of event details
+    playlistId: v.optional(v.id("userPlaylists")),
+    mediaId: v.optional(v.id("medias")),
+    sessionId: v.optional(v.string()),
+    deviceType: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
     timestamp: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_media", ["mediaId"])
+    .index("by_type", ["eventType"])
     .index("by_timestamp", ["timestamp"])
-    .index("by_user_timestamp", ["userId", "timestamp"]),
+    .index("by_user_timestamp", ["userId", "timestamp"])
+    .index("by_session", ["sessionId"]),
 
-  // System notifications and announcements
+  // Admin audit trail
+  adminActions: defineTable({
+    adminUserId: v.id("users"),
+    action: v.string(), // "playlist_published", "user_suspended", etc.
+    targetType: v.string(), // "playlist", "user", "media", etc.
+    targetId: v.string(),
+    details: v.optional(v.string()), // JSON string of action details
+    ipAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    timestamp: v.number(),
+  })
+    .index("by_admin", ["adminUserId"])
+    .index("by_target_type", ["targetType"])
+    .index("by_action", ["action"])
+    .index("by_timestamp", ["timestamp"]),
+
+  // =================================================================
+  // NOTIFICATIONS
+  // =================================================================
+
   notifications: defineTable({
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("system"),
+      v.literal("playlist_update"),
+      v.literal("subscription"),
+      v.literal("content_available")
+    ),
     title: v.string(),
     message: v.string(),
-    type: v.union(
-      v.literal("info"),
-      v.literal("warning"),
-      v.literal("error"),
-      v.literal("success")
-    ),
-    targetAudience: v.union(
-      v.literal("all"),
-      v.literal("admins"),
-      v.literal("subscribers")
-    ),
-    isActive: v.boolean(),
+    isRead: v.boolean(),
+    actionUrl: v.optional(v.string()),
+    metadata: v.optional(v.string()), // JSON string
     expiresAt: v.optional(v.number()),
     createdAt: v.number(),
   })
-    .index("by_active", ["isActive"])
-    .index("by_target", ["targetAudience"])
-    .index("by_expires", ["expiresAt"]),
+    .index("by_user", ["userId"])
+    .index("by_user_unread", ["userId", "isRead"])
+    .index("by_type", ["type"])
+    .index("by_expiry", ["expiresAt"]),
+
+  // =================================================================
+  // FILE UPLOAD TRACKING
+  // =================================================================
+
+  uploadSessions: defineTable({
+    uploadKey: v.string(),
+    fileName: v.string(),
+    originalName: v.string(),
+    fileSize: v.number(),
+    contentType: v.string(),
+    uploadStatus: v.union(
+      v.literal("pending"),
+      v.literal("uploading"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    storageId: v.optional(v.id("_storage")),
+    mediaId: v.optional(v.id("medias")),
+    uploadedBy: v.id("users"),
+    uploadProgress: v.optional(v.number()), // 0-100
+    errorMessage: v.optional(v.string()),
+    processingMetadata: v.optional(v.string()), // JSON string
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_upload_key", ["uploadKey"])
+    .index("by_status", ["uploadStatus"])
+    .index("by_user", ["uploadedBy"])
+    .index("by_media", ["mediaId"])
+    .index("by_storage_id", ["storageId"]),
+};
+
+export default defineSchema({
+  ...authTables,
+  ...applicationTables,
 });
