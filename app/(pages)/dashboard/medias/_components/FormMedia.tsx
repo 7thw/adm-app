@@ -29,9 +29,9 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
   const [selectedAudioFile, setSelectedAudioFile] = useState<File | null>(null)
 
   // OFFICIAL R2 APPROACH: Use the useUploadFile hook
-  const uploadFile = useUploadFile(api.r2Upload)
+  const uploadFile = useUploadFile(api.R2)
   const updateMetadata = useMutation(api.media.updateUploadMetadata)
-  
+
   // Convex mutations
   const createVideoMedia = useMutation(api.media.createVideoMedia)
 
@@ -128,7 +128,7 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
     try {
       if (mediaType === "audio" && selectedAudioFile) {
         console.log("Starting audio upload with official R2 pattern...")
-        
+
         // Capture file metadata before upload
         const fileMetadata = {
           contentType: selectedAudioFile.type,
@@ -137,13 +137,13 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
         };
 
         console.log("Uploading file with metadata:", fileMetadata);
-        
+
         // OFFICIAL R2 PATTERN: Just use the useUploadFile hook
         // The hook will call generateUploadUrl and syncMetadata automatically
         const uploadKey = await uploadFile(selectedAudioFile)
-        
+
         console.log("Upload completed with key:", uploadKey)
-        
+
         // Update the database record with actual file metadata and form data
         try {
           await updateMetadata({
@@ -158,7 +158,7 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
         } catch (metadataError) {
           console.warn("Failed to update metadata, but upload succeeded:", metadataError);
         }
-        
+
         toast.success("Audio uploaded successfully!")
       } else {
         // Video media (no upload needed)
@@ -189,7 +189,7 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
 
     } catch (error) {
       console.error("Upload error:", error)
-      
+
       if (error instanceof Error) {
         if (error.message.includes('Admin access required')) {
           toast.error("You need admin access to upload media.")

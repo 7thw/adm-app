@@ -267,7 +267,7 @@ subscriptionUsage: {
    ```bash
    cd adm-app
    npx convex dev              # Start Convex backend
-   npm run dev                 # Start admin interface
+   pnpm run dev                 # Start admin interface
    ```
 
 2. **API Generation**
@@ -279,7 +279,7 @@ subscriptionUsage: {
 3. **PWA App Development**
    ```bash
    cd pwa-app
-   npm run dev                 # Start PWA interface
+   pnpm run dev                 # Start PWA interface
    ```
 
 ### Type-Safe Integration
@@ -398,7 +398,7 @@ The Realigna Convex backend is live with 80+ optimized indexes, complete schema,
 
 **Quick Start:**
 ```bash
-npm install && npm run dev
+pnpm install && pnpm run dev
 ```
 
 **Access:**

@@ -7,7 +7,7 @@ import { useQuery } from "convex/react"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { DataTable } from "./_components/data-table"
 import { SectionCards } from "./_components/section-cards"
-import { schema } from "./_components/data-table"
+// import { schema } from "./_components/data-table"
 
 export default function MediasPage() {
   const { isSignedIn, isLoaded } = useUser()

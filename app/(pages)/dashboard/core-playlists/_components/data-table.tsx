@@ -159,11 +159,11 @@ export function DataTable<TData extends TableData>({
   })
 
   // Convex mutations
-  const updateSection = useMutation(api.coreSections.update)
-  const deleteSection = useMutation(api.coreSections.remove)
-  const reorderSections = useMutation(api.coreSections.reorder)
+  const updateSection = useMutation(api.admin.coreSections.update)
+  const deleteSection = useMutation(api.admin.coreSections.remove)
+  const reorderSections = useMutation(api.admin.coreSections.reorder)
   // TODO: Add duplicate function to coreSections API
-  // const duplicateSection = useMutation(api.coreSections.duplicate)
+  // const duplicateSection = useMutation(api.admin.coreSections.duplicate)
 
   const sortableId = React.useId()
   const sensors = useSensors(
