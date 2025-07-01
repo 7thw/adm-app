@@ -104,9 +104,7 @@ export const addMediaTag = mutation({
     // Check if tag already exists for this media
     const existingTag = await ctx.db
       .query("mediaTags")
-      .withIndex("by_media_tag", (q) =>
-        q.eq("mediaId", args.mediaId).eq("tag", args.tag)
-      )
+      .withIndex("by_core_media_tag", (q) => q.eq("coreMediaId", args.coreMediaId).eq("tag", args.tag))
       .unique();
 
     if (existingTag) {
@@ -115,7 +113,7 @@ export const addMediaTag = mutation({
 
     // Create new tag
     const tagId = await ctx.db.insert("mediaTags", {
-      mediaId: args.coreMediaId,
+      coreMediaId: args.coreMediaId,
       tag: args.tag,
       createdAt: Date.now(),
     });
@@ -135,9 +133,7 @@ export const removeMediaTag = mutation({
     // Find the tag
     const tag = await ctx.db
       .query("mediaTags")
-      .withIndex("by_media_tag", (q) =>
-        q.eq("mediaId", args.mediaId).eq("tag", args.tag)
-      )
+      .withIndex("by_core_media_tag", (q) => q.eq("coreMediaId", args.coreMediaId).eq("tag", args.tag))
       .unique();
 
     if (!tag) {
@@ -167,7 +163,7 @@ export const getMediaTags = query({
     // Get all tags for this media
     const tags = await ctx.db
       .query("mediaTags")
-      .withIndex("by_media", (q) => q.eq("mediaId", args.mediaId))
+      .withIndex("by_core_media", (q) => q.eq("coreMediaId", args.coreMediaId))
       .collect();
 
     return tags.map(tag => tag.tag);
@@ -201,25 +197,25 @@ export const searchMediaByTags = query({
     // Flatten the results
     const taggedMedias = tagQueries.flat();
 
-    // Group by mediaId and count tags
+    // Group by coreMediaId and count tags
     const mediaTagCounts = new Map();
-    const mediaIds = new Set();
+    const coreMediaIds = new Set();
 
     for (const taggedMedia of taggedMedias) {
-      const { mediaId } = taggedMedia;
-      mediaIds.add(mediaId);
+      const { coreMediaId } = taggedMedia;
+      coreMediaIds.add(coreMediaId);
 
-      if (!mediaTagCounts.has(mediaId)) {
-        mediaTagCounts.set(mediaId, 1);
+      if (!mediaTagCounts.has(coreMediaId)) {
+        mediaTagCounts.set(coreMediaId, 1);
       } else {
-        mediaTagCounts.set(mediaId, mediaTagCounts.get(mediaId) + 1);
+        mediaTagCounts.set(coreMediaId, mediaTagCounts.get(coreMediaId) + 1);
       }
     }
 
     // Filter by matchAll if required
-    const filteredMediaIds = Array.from(mediaIds).filter(mediaId => {
+    const filteredMediaIds = Array.from(coreMediaIds).filter(coreMediaId => {
       if (args.matchAll) {
-        return mediaTagCounts.get(mediaId) === args.tags.length;
+        return mediaTagCounts.get(coreMediaId) === args.tags.length;
       }
       return true;
     });
@@ -231,9 +227,9 @@ export const searchMediaByTags = query({
     // Get the actual media documents
     // Since we can't use q.in directly, we'll query for each ID separately and combine results
     const mediaQueries = await Promise.all(
-      filteredMediaIds.map(async (mediaId) => {
+      filteredMediaIds.map(async (coreMediaId) => {
         // Type assertion needed for Convex's query filter
-        const typedMediaId = mediaId as any;
+        const typedMediaId = coreMediaId as any;
         let query = ctx.db.query("medias").filter((q) => q.eq(q.field("_id"), typedMediaId));
 
         // Add media type filter if provided
@@ -364,11 +360,11 @@ export const updateMedia = mutation({
       throw new Error("Media not found");
     }
 
-    // Extract mediaId from args and create update object with remaining fields
-    const { mediaId, ...updateFields } = args;
+    // Extract coreMediaId from args and create update object with remaining fields
+    const { coreMediaId, ...updateFields } = args;
 
     // Update the media
-    await ctx.db.patch(mediaId, updateFields);
+    await ctx.db.patch(coreMediaId, updateFields);
 
     return { success: true };
   },
@@ -390,7 +386,7 @@ export const deleteMedia = mutation({
     // Check if media is used in any sections
     const sectionMedias = await ctx.db
       .query("sectionMedias")
-      .withIndex("by_media", (q) => q.eq("mediaId", args.mediaId))
+      .withIndex("by_core_media", (q) => q.eq("coreMediaId", args.coreMediaId))
       .collect();
 
     if (sectionMedias.length > 0) {
@@ -400,7 +396,7 @@ export const deleteMedia = mutation({
     // Delete any associated media tags
     const mediaTags = await ctx.db
       .query("mediaTags")
-      .withIndex("by_media", (q) => q.eq("mediaId", args.mediaId))
+      .withIndex("by_core_media", (q) => q.eq("coreMediaId", args.coreMediaId))
       .collect();
 
     for (const tag of mediaTags) {
@@ -418,7 +414,7 @@ export const deleteMedia = mutation({
     }
 
     // Delete the media record
-    await ctx.db.delete(args.mediaId);
+    await ctx.db.delete(args.coreMediaId);
 
     return { success: true };
   },
@@ -457,17 +453,17 @@ export const updateMediaMetadata = mutation({
       throw new Error("Media not found");
     }
 
-    // Extract mediaId from args and create update object with remaining fields
-    const { mediaId, ...updateFields } = args;
+    // Extract coreMediaId from args and create update object with remaining fields
+    const { coreMediaId, ...updateFields } = args;
 
     // Update the media metadata
-    await ctx.db.patch(mediaId, updateFields);
+    await ctx.db.patch(coreMediaId, updateFields);
 
     // If we're updating the status to completed, also update any related upload sessions
     if (args.processingStatus === "completed") {
       const uploadSessions = await ctx.db
         .query("uploadSessions")
-        .withIndex("by_media", (q) => q.eq("mediaId", mediaId))
+        .withIndex("by_media", (q) => q.eq("mediaId", coreMediaId))
         .collect();
 
       for (const session of uploadSessions) {
@@ -671,10 +667,10 @@ export const createCoreSection = mutation({
   },
 });
 
-export const addMediaToSection = mutation({
+export const addMediaToCoreSection = mutation({
   args: {
-    sectionId: v.id("coreSections"),
-    mediaId: v.id("medias"),
+    coreSectionId: v.id("coreSections"),
+    coreMediaId: v.id("medias"),
     isOptional: v.optional(v.boolean()),
     defaultSelected: v.optional(v.boolean()),
   },
@@ -682,7 +678,7 @@ export const addMediaToSection = mutation({
     await requireAdminAccess(ctx);
 
     // Validate section exists and playlist is in draft
-    const section = await ctx.db.get(args.sectionId);
+    const section = await ctx.db.get(args.coreSectionId);
     if (!section) {
       throw new Error("Section not found");
     }
@@ -695,8 +691,8 @@ export const addMediaToSection = mutation({
     // Check if media already exists in section
     const existing = await ctx.db
       .query("sectionMedias")
-      .withIndex("by_section", (q) => q.eq("sectionId", args.sectionId))
-      .filter((q) => q.eq(q.field("mediaId"), args.mediaId))
+      .withIndex("by_core_section", (q) => q.eq("coreSectionId", args.coreSectionId))
+      .filter((q) => q.eq(q.field("coreMediaId"), args.coreMediaId))
       .unique();
 
     if (existing) {
@@ -706,14 +702,14 @@ export const addMediaToSection = mutation({
     // Get next order number
     const sectionMedias = await ctx.db
       .query("sectionMedias")
-      .withIndex("by_section_order", (q) => q.eq("sectionId", args.sectionId))
+      .withIndex("by_core_section_order", (q) => q.eq("coreSectionId", args.coreSectionId))
       .order("desc")
       .take(1);
 
     const nextOrder = sectionMedias.length > 0 ? sectionMedias[0].order + 1 : 1;
 
     const sectionMediaId = await ctx.db.insert("sectionMedias", {
-      sectionId: args.sectionId,
+      coreSectionId: args.coreSectionId,
       coreMediaId: args.coreMediaId,
       order: nextOrder,
       isOptional: args.isOptional ?? false,
@@ -734,7 +730,7 @@ export const listCoreSections = query({
     if (args.corePlaylistId) {
       return await ctx.db
         .query("coreSections")
-        .withIndex("by_core_playlist_order", (q) => q.eq("corePlaylistId", args.corePlaylistId))
+        .withIndex("by_core_playlist_order", (q) => q.eq("corePlaylistId", args.corePlaylistId!))
         .order("asc")
         .collect();
     }
@@ -759,14 +755,14 @@ export const updateCoreSection = mutation({
     await requireAdminAccess(ctx);
 
     // Validate section exists
-    const section = await ctx.db.get(args.sectionId);
+    const section = await ctx.db.get(args.coreSectionId);
     if (!section) {
       throw new Error("Section not found");
     }
 
     // Validate core playlist is in draft status
-    const playlist = await ctx.db.get(section.corePlaylistId);
-    if (!playlist || corePlaylist.status === "published") {
+    const corePlaylist = await ctx.db.get(section.corePlaylistId);
+    if (!corePlaylist || corePlaylist.status === "published") {
       throw new Error("Cannot modify published core playlist");
     }
 
@@ -786,15 +782,15 @@ export const updateCoreSection = mutation({
 });
 
 // Remove a core section
-export const removeCoreSection = mutation({
+export const deleteCoreSection = mutation({
   args: {
-    sectionId: v.id("coreSections"),
+    coreSectionId: v.id("coreSections"),
   },
   handler: async (ctx, args): Promise<{ success: boolean }> => {
     await requireAdminAccess(ctx);
 
     // Validate section exists
-    const section = await ctx.db.get(args.sectionId);
+    const section = await ctx.db.get(args.coreSectionId);
     if (!section) {
       throw new Error("Section not found");
     }
@@ -808,7 +804,7 @@ export const removeCoreSection = mutation({
     // Delete all media associations first
     const sectionMedias = await ctx.db
       .query("sectionMedias")
-      .withIndex("by_section", (q) => q.eq("sectionId", args.sectionId))
+      .withIndex("by_core_section", (q) => q.eq("coreSectionId", args.coreSectionId))
       .collect();
 
     for (const media of sectionMedias) {
@@ -816,12 +812,12 @@ export const removeCoreSection = mutation({
     }
 
     // Delete the section
-    await ctx.db.delete(args.sectionId);
+    await ctx.db.delete(args.coreSectionId);
 
     // Reorder remaining sections
     const remainingSections = await ctx.db
       .query("coreSections")
-      .withIndex("by_core_playlist_order", (q) => q.eq("corePlaylistId", section.corePlaylistId))
+      .withIndex("by_core_playlist", (q) => q.eq("corePlaylistId", section.corePlaylistId))
       .order("asc")
       .collect();
 
@@ -905,7 +901,7 @@ export const deleteCorePlaylist = mutation({
     for (const section of sections) {
       const sectionMedias = await ctx.db
         .query("sectionMedias")
-        .withIndex("by_section", (q) => q.eq("sectionId", section._id))
+        .withIndex("by_core_section", (q) => q.eq("coreSectionId", section._id))
         .collect();
 
       for (const media of sectionMedias) {
@@ -922,7 +918,6 @@ export const deleteCorePlaylist = mutation({
     return { success: true };
   },
 });
-
 
 // =================================================================
 // CLAUDE ENHANCEMENTS - Core Playlists Features
@@ -983,13 +978,13 @@ export const duplicateCorePlaylist = mutation({
         // Copy section medias
         const sectionMedias = await ctx.db
           .query("sectionMedias")
-          .withIndex("by_section_order", (q) => q.eq("sectionId", section._id))
+          .withIndex("by_core_section_order", (q) => q.eq("coreSectionId", section._id))
           .collect();
 
         for (const media of sectionMedias) {
           await ctx.db.insert("sectionMedias", {
-            sectionId: newSectionId,
-            mediaId: media.mediaId,
+            coreSectionId: newSectionId,
+            coreMediaId: media.coreMediaId,
             order: media.order,
             isOptional: media.isOptional,
             defaultSelected: media.defaultSelected,
@@ -1033,17 +1028,17 @@ export const updateCorePlaylistThumbnail = mutation({
 });
 
 // Batch add medias to section
-export const batchAddMediasToSection = mutation({
+export const addMediasToCoreSectionBatch = mutation({
   args: {
-    sectionId: v.id("coreSections"),
-    mediaIds: v.array(v.id("medias")),
+    coreSectionId: v.id("coreSections"),
+    coreMediaIds: v.array(v.id("medias")),
     startOrder: v.optional(v.number())
   },
   handler: async (ctx, args): Promise<{ success: boolean; addedCount: number; skippedCount: number; }> => {
     await requireAdminAccess(ctx);
 
     // Validate section exists and playlist is in draft
-    const section = await ctx.db.get(args.sectionId);
+    const section = await ctx.db.get(args.coreSectionId);
     if (!section) {
       throw new Error("Section not found");
     }
@@ -1058,7 +1053,7 @@ export const batchAddMediasToSection = mutation({
     if (!args.startOrder) {
       const lastMedia = await ctx.db
         .query("sectionMedias")
-        .withIndex("by_section_order", (q) => q.eq("sectionId", args.sectionId))
+        .withIndex("by_core_section_order", (q) => q.eq("coreSectionId", args.coreSectionId))
         .order("desc")
         .first();
       order = lastMedia ? lastMedia.order + 1 : 1;
@@ -1066,45 +1061,45 @@ export const batchAddMediasToSection = mutation({
 
     // Add each media to the section
     const addedMediaIds = [];
-    for (const mediaId of args.mediaIds) {
+    for (const coreMediaId of args.coreMediaIds) {
       // Check if media already exists in section
       const existing = await ctx.db
         .query("sectionMedias")
-        .withIndex("by_section", (q) => q.eq("sectionId", args.sectionId))
-        .filter((q) => q.eq(q.field("mediaId"), mediaId))
+        .withIndex("by_core_section", (q) => q.eq("coreSectionId", args.coreSectionId))
+        .filter((q) => q.eq(q.field("coreMediaId"), coreMediaId))
         .unique();
 
       if (!existing) {
         await ctx.db.insert("sectionMedias", {
-          sectionId: args.sectionId,
-          mediaId,
+          coreSectionId: args.coreSectionId,
+          coreMediaId: coreMediaId,
           order: order++,
           isOptional: false,
           defaultSelected: true,
         });
-        addedMediaIds.push(mediaId);
+        addedMediaIds.push(coreMediaId);
       }
     }
 
     return {
       success: true,
       addedCount: addedMediaIds.length,
-      skippedCount: args.mediaIds.length - addedMediaIds.length
+      skippedCount: args.coreMediaIds.length - addedMediaIds.length
     };
   },
 });
 
 // Batch remove medias from section
-export const batchRemoveMediasFromSection = mutation({
+export const removeMediasFromCoreSection = mutation({
   args: {
-    sectionId: v.id("coreSections"),
-    mediaIds: v.array(v.id("medias"))
+    coreSectionId: v.id("coreSections"),
+    coreMediaIds: v.array(v.id("medias"))
   },
   handler: async (ctx, args): Promise<{ success: boolean; removedCount: number; }> => {
     await requireAdminAccess(ctx);
 
     // Validate section exists and playlist is in draft
-    const section = await ctx.db.get(args.sectionId);
+    const section = await ctx.db.get(args.coreSectionId);
     if (!section) {
       throw new Error("Section not found");
     }
@@ -1115,11 +1110,11 @@ export const batchRemoveMediasFromSection = mutation({
     }
 
     let removedCount = 0;
-    for (const mediaId of args.mediaIds) {
+    for (const coreMediaId of args.coreMediaIds) {
       const sectionMedia = await ctx.db
         .query("sectionMedias")
-        .withIndex("by_section", (q) => q.eq("sectionId", args.sectionId))
-        .filter((q) => q.eq(q.field("mediaId"), mediaId))
+        .withIndex("by_core_section", (q) => q.eq("coreSectionId", args.coreSectionId))
+        .filter((q) => q.eq(q.field("coreMediaId"), coreMediaId))
         .unique();
 
       if (sectionMedia) {
@@ -1158,12 +1153,12 @@ export const getPlaylistPreview = query({
       sections.map(async (section) => {
         const sectionMedias = await ctx.db
           .query("sectionMedias")
-          .withIndex("by_section_order", (q) => q.eq("sectionId", section._id))
+          .withIndex("by_core_section_order", (q) => q.eq("coreSectionId", section._id))
           .collect();
 
         const mediasWithDetails = await Promise.all(
           sectionMedias.map(async (sm) => {
-            const media = await ctx.db.get(sm.mediaId);
+            const media = await ctx.db.get(sm.coreMediaId);
             return {
               ...sm,
               media
@@ -1189,8 +1184,8 @@ export const getPlaylistPreview = query({
   },
 });
 
-// Get playlist stats for analytics
-export const getPlaylistStats = query({
+// Get core playlist stats for analytics
+export const getCorePlaylistStats = query({
   args: {
     corePlaylistId: v.id("corePlaylists")
   },
@@ -1213,7 +1208,7 @@ export const getPlaylistStats = query({
     for (const section of sectionsCount) {
       const medias = await ctx.db
         .query("sectionMedias")
-        .withIndex("by_section", (q) => q.eq("sectionId", section._id))
+        .withIndex("by_core_section", (q) => q.eq("coreSectionId", section._id))
         .collect();
       totalMedias += medias.length;
     }

@@ -136,8 +136,8 @@ const columns: ColumnDef<PlaylistSection>[] = [
     header: "Limit",
   },
   {
-    accessorKey: "playlistId",
-    header: "Playlist ID",
+    accessorKey: "corePlaylistId",
+    header: "Core Playlist ID",
   },
 ]
 

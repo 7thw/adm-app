@@ -155,7 +155,7 @@ export function DataTable<TData extends TableData>({
   })
 
   // Convex mutations
-  const deleteSection = useMutation(api.admin.removeCoreSection)
+  const deleteSection = useMutation(api.admin.deleteCoreSection)
   const reorderSections = useMutation(api.admin.reorderCoreSections)
   // TODO: Add duplicate function to coreSections API
   // const duplicateSection = useMutation(api.admin.duplicateCoreSection)
@@ -355,7 +355,7 @@ export function DataTable<TData extends TableData>({
 
   const handleEdit = (section: TData) => {
     // Navigate to the edit page for this section
-    window.location.href = `/dashboard/core-playlists/${section.playlistId}/sections/${section._id}/edit`
+    window.location.href = `/dashboard/core-playlists/${section.corePlaylistId}/sections/${section._id}/edit`
   }
 
   const handleDuplicate = async (section: TData) => {
@@ -375,7 +375,7 @@ export function DataTable<TData extends TableData>({
     }
 
     try {
-      await deleteSection({ sectionId: section._id })
+      await deleteSection({ coreSectionId: section._id })
       toast.success("Section deleted successfully")
     } catch (error) {
       console.error("Error deleting section:", error)
@@ -483,8 +483,6 @@ export function DataTable<TData extends TableData>({
                     <DraggableRow
                       key={row.id}
                       row={row}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
                     />
                   ))}
                 </SortableContext>

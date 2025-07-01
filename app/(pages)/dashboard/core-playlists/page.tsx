@@ -18,16 +18,16 @@ export default function CorePlaylistsPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch core playlists from Convex with proper typing
-  const playlists = useQuery(api.admin.listCorePlaylists, {}) || [];
+  const corePlaylists = useQuery(api.admin.listCorePlaylists, {}) || [];
 
   // Get categories to display category names
   const categories = useQuery(api.admin.listCoreCategories, {}) || [];
 
-  // Mutations for playlist operations
-  const duplicatePlaylist = useMutation(api.admin.duplicateCorePlaylist);
+  // Mutations for core playlist operations
+  const duplicateCorePlaylist = useMutation(api.admin.duplicateCorePlaylist);
 
   // Loading state based on Convex query
-  const isLoading = playlists === undefined;
+  const isLoading = corePlaylists === undefined;
 
   // Get category name by ID
   const getCategoryName = (categoryId: string | Id<"coreCategories">) => {
@@ -36,35 +36,35 @@ export default function CorePlaylistsPage() {
     return category ? category.name : "Unknown Category";
   };
 
-  // Filter playlists based on search query
-  const filteredPlaylists = playlists.filter((playlist: Doc<"corePlaylists">) => {
-    const titleMatch = playlist.title?.toLowerCase().includes(searchQuery.toLowerCase()) || false;
-    const descriptionMatch = playlist.description?.toLowerCase().includes(searchQuery.toLowerCase()) || false;
-    const categoryMatch = getCategoryName(playlist.categoryId).toLowerCase().includes(searchQuery.toLowerCase());
+  // Filter core playlists based on search query
+  const filteredCorePlaylists = corePlaylists.filter((corePlaylist: Doc<"corePlaylists">) => {
+    const titleMatch = corePlaylist.title?.toLowerCase().includes(searchQuery.toLowerCase()) || false;
+    const descriptionMatch = corePlaylist.description?.toLowerCase().includes(searchQuery.toLowerCase()) || false;
+    const categoryMatch = getCategoryName(corePlaylist.categoryId).toLowerCase().includes(searchQuery.toLowerCase());
 
     return titleMatch || descriptionMatch || categoryMatch;
   });
 
-  // Handler for creating new playlist
-  const handleCreatePlaylist = () => {
+  // Handler for creating new core playlist
+  const handleCreateCorePlaylist = () => {
     router.push("/dashboard/core-playlists/new");
   };
 
-  // Handler for duplicating playlist
-  const handleDuplicatePlaylist = async (playlist: Doc<"corePlaylists">) => {
+  // Handler for duplicating core playlist
+  const handleDuplicateCorePlaylist = async (corePlaylist: Doc<"corePlaylists">) => {
     try {
-      const newTitle = `${playlist.title} (Copy)`;
-      const newPlaylistId = await duplicatePlaylist({
-        sourcePlaylistId: playlist._id,
+      const newTitle = `${corePlaylist.title} (Copy)`;
+      const newCorePlaylistId = await duplicateCorePlaylist({
+        sourcePlaylistId: corePlaylist._id,
         newTitle,
         keepSections: true, // Include sections in the duplicate
       });
       
-      toast.success(`Playlist duplicated successfully!`);
-      router.push(`/dashboard/core-playlists/${newPlaylistId}/edit`);
+      toast.success(`Core playlist duplicated successfully!`);
+      router.push(`/dashboard/core-playlists/${newCorePlaylistId}/edit`);
     } catch (error) {
-      console.error("Error duplicating playlist:", error);
-      toast.error("Failed to duplicate playlist");
+      console.error("Error duplicating core playlist:", error);
+      toast.error("Failed to duplicate core playlist");
     }
   };
 
@@ -75,7 +75,7 @@ export default function CorePlaylistsPage() {
           <h1 className="text-3xl font-bold">Core Playlists</h1>
           <p className="text-muted-foreground">Manage your master playlists for subscribers</p>
         </div>
-        <Button onClick={handleCreatePlaylist}>
+        <Button onClick={handleCreateCorePlaylist}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Create Core Playlist
         </Button>
@@ -84,7 +84,7 @@ export default function CorePlaylistsPage() {
       <div className="mb-6 relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search playlists..."
+          placeholder="Search core playlists..."
           className="pl-10 max-w-md"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -94,34 +94,34 @@ export default function CorePlaylistsPage() {
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2 text-lg">Loading playlists...</span>
+          <span className="ml-2 text-lg">Loading core playlists...</span>
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredPlaylists.map((playlist: Doc<"corePlaylists">) => (
-            <Card key={playlist._id.toString()} className="hover:shadow-md transition-shadow">
+          {filteredCorePlaylists.map((corePlaylist: Doc<"corePlaylists">) => (
+            <Card key={corePlaylist._id.toString()} className="hover:shadow-md transition-shadow">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center">
                     <List className="mr-2 h-5 w-5 text-primary" />
-                    {playlist.title}
+                    {corePlaylist.title}
                   </CardTitle>
                   <div className="flex items-center gap-2">
-                    <Badge variant={playlist.status === "published" ? "default" : "outline"}>
-                      {playlist.status === "published" ? "Published" : "Draft"}
+                    <Badge variant={corePlaylist.status === "published" ? "default" : "outline"}>
+                      {corePlaylist.status === "published" ? "Published" : "Draft"}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
-                      Category: {getCategoryName(playlist.categoryId || "")}
+                      Category: {getCategoryName(corePlaylist.categoryId || "")}
                     </span>
                   </div>
                 </div>
-                <CardDescription>{playlist.description}</CardDescription>
+                <CardDescription>{corePlaylist.description}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col gap-2">
                   <div className="flex justify-between text-sm">
                     <div>Category</div>
-                    <div className="font-medium">{getCategoryName(playlist.categoryId)}</div>
+                    <div className="font-medium">{getCategoryName(corePlaylist.categoryId)}</div>
                   </div>
                 </div>
               </CardContent>
@@ -131,7 +131,7 @@ export default function CorePlaylistsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => router.push(`/dashboard/core-playlists/${playlist._id}/preview`)}
+                      onClick={() => router.push(`/dashboard/core-playlists/${corePlaylist._id}/preview`)}
                       className="gap-2"
                     >
                       <Link className="h-4 w-4" />
@@ -140,7 +140,7 @@ export default function CorePlaylistsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDuplicatePlaylist(playlist)}
+                      onClick={() => handleDuplicateCorePlaylist(corePlaylist)}
                       className="gap-2"
                     >
                       <Copy className="h-4 w-4" />
@@ -150,7 +150,7 @@ export default function CorePlaylistsPage() {
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={() => router.push(`/dashboard/core-playlists/${playlist._id}/edit`)}
+                    onClick={() => router.push(`/dashboard/core-playlists/${corePlaylist._id}/edit`)}
                     className="gap-2"
                   >
                     <Edit className="h-4 w-4" />
@@ -163,16 +163,16 @@ export default function CorePlaylistsPage() {
         </div>
       )}
 
-      {!isLoading && filteredPlaylists.length === 0 && (
+      {!isLoading && filteredCorePlaylists.length === 0 && (
         <div className="text-center py-12">
           <List className="mx-auto h-12 w-12 text-muted-foreground" />
           <h3 className="mt-4 text-lg font-semibold">
-            {searchQuery ? "No matching playlists found" : "No playlists found"}
+            {searchQuery ? "No matching core playlists found" : "No core playlists found"}
           </h3>
           <p className="text-muted-foreground">
             {searchQuery
               ? "Try adjusting your search query."
-              : "Get started by creating a new playlist."}
+              : "Get started by creating a new core playlist."}
           </p>
         </div>
       )}

@@ -37,7 +37,7 @@ export default function AddSectionForm({ corePlaylistId }: AddSectionFormProps) 
 
     try {
       await createSection({
-        playlistId: corePlaylistId,
+        corePlaylistId: corePlaylistId,
         title,
         description,
         sectionType: type,

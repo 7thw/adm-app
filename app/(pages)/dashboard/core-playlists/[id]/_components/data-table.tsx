@@ -1,5 +1,6 @@
 "use client"
 
+import { Doc, Id } from "@/convex/_generated/dataModel"
 import {
   DndContext,
   KeyboardSensor,
@@ -49,8 +50,6 @@ import {
 } from "lucide-react"
 import * as React from "react"
 import { toast } from "sonner"
-import { Doc } from "@/convex/_generated/dataModel"
-import { Id } from "@/convex/_generated/dataModel"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -248,14 +247,14 @@ const columns: ColumnDef<Doc<"coreSections">>[] = [
     ),
   },
   {
-    accessorKey: "playlistId",
+    accessorKey: "corePlaylistId",
     header: "Playlist ID",
     cell: ({ row }) => {
       // Check if a playlistId exists
-      const isAssigned = row.original.playlistId !== undefined
+      const isAssigned = row.original.corePlaylistId !== undefined
 
       if (isAssigned) {
-        const reviewer = String(row.original.playlistId)
+        const reviewer = String(row.original.corePlaylistId)
         return reviewer
       }
 

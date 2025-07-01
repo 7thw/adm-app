@@ -82,7 +82,9 @@ const applicationTables = {
     title: v.string(),
     description: v.optional(v.string()),
     mediaType: v.union(v.literal("audio"), v.literal("video")),
-    // For audio files uploaded to Convex storage
+    // For audio files uploaded to R2 storage
+    r2Key: v.optional(v.string()), // R2 object key for management
+    // Legacy Convex storage (for migration)
     storageId: v.optional(v.id("_storage")),
     // For video embeds (YouTube, etc.)
     embedUrl: v.optional(v.string()),
@@ -117,13 +119,13 @@ const applicationTables = {
 
   // Media tags for better organization
   mediaTags: defineTable({
-    mediaId: v.id("medias"),
+    coreMediaId: v.id("medias"),
     tag: v.string(),
     createdAt: v.number(),
   })
-    .index("by_media", ["mediaId"])
+    .index("by_core_media", ["coreMediaId"])
     .index("by_tag", ["tag"])
-    .index("by_media_tag", ["mediaId", "tag"]),
+    .index("by_core_media_tag", ["coreMediaId", "tag"]),
 
   // Core playlists (admin-managed templates)
   corePlaylists: defineTable({
@@ -163,15 +165,15 @@ const applicationTables = {
 
   // Media items within sections
   sectionMedias: defineTable({
-    sectionId: v.id("coreSections"),
-    mediaId: v.id("medias"),
+    coreSectionId: v.id("coreSections"),
+    coreMediaId: v.id("medias"),
     order: v.number(),
     isOptional: v.boolean(),
     defaultSelected: v.boolean(),
   })
-    .index("by_section", ["sectionId"])
-    .index("by_section_order", ["sectionId", "order"])
-    .index("by_media", ["mediaId"]),
+    .index("by_core_section", ["coreSectionId"])
+    .index("by_core_section_order", ["coreSectionId", "order"])
+    .index("by_core_media", ["coreMediaId"]),
 
   // =================================================================
   // USER CUSTOMIZATION & EXPERIENCE (PWA App)

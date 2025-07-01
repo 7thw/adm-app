@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils"
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
 
-interface PlaylistFormProps {
+interface CorePlaylistFormProps {
   initialData?: {
     _id?: Id<"corePlaylists">
     title?: string
@@ -25,17 +25,17 @@ interface PlaylistFormProps {
     status?: "draft" | "published"
     thumbnailStorageId?: Id<"_storage">
   }
-  onSuccess?: (playlistId: Id<"corePlaylists">) => void
+  onSuccess?: (corePlaylistId: Id<"corePlaylists">) => void
   submitLabel?: string
   isEdit?: boolean
 }
 
-export function PlaylistForm({
+export default function CorePlaylistForm({
   initialData,
   onSuccess,
-  submitLabel = "Create Playlist",
+  submitLabel = "Create Core Playlist",
   isEdit = false
-}: PlaylistFormProps) {
+}: CorePlaylistFormProps) {
   const [title, setTitle] = useState(initialData?.title || "")
   const [description, setDescription] = useState(initialData?.description || "")
   const [categoryId, setCategoryId] = useState<Id<"coreCategories"> | "">(
@@ -137,7 +137,7 @@ export function PlaylistForm({
         }
       } else {
         // Create new playlist
-        const newPlaylistId = await createCorePlaylist({
+        const newCorePlaylistId = await createCorePlaylist({
           title,
           description,
           categoryId: categoryId as Id<"coreCategories">,
@@ -145,7 +145,7 @@ export function PlaylistForm({
         })
         toast.success("Playlist created successfully!")
         if (onSuccess) {
-          onSuccess(newPlaylistId)
+          onSuccess(newCorePlaylistId)
         }
       }
     } catch (error) {
@@ -258,7 +258,7 @@ export function PlaylistForm({
                       Remove
                     </Button>
                   )}
-                  <input
+                  <Input
                     id="thumbnail-file-input"
                     ref={fileInputRef}
                     type="file"

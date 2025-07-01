@@ -77,6 +77,7 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
   // Convex Hooks
   const createMedia = useMutation(api.admin.createMedia)
   const uploadFile = useUploadFile(api.r2Upload)
+  const createCoreMediaRecord = useMutation(api.r2Upload.createCoreMediaRecord)
 
   // =================================================================
   // EFFECTS
@@ -153,20 +154,19 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
       if (mediaType === "audio") {
         if (!selectedFile) throw new Error("No audio file selected.")
 
-        const { storageId } = await uploadFile(selectedFile, {
-          onUploadProgress: (progress) => setUploadProgress(progress),
-        })
-
-        await createMedia({
+        // Upload file to R2 using the official R2 hook
+        // The uploadFile function returns the R2 key directly
+        const r2Key = await uploadFile(selectedFile)
+        
+        // Create core media record with R2 data
+        await createCoreMediaRecord({
           title,
           description,
           mediaType: "audio",
-          storageId: storageId as Id<"_storage">,
+          r2Key: r2Key,
           duration,
           fileSize: selectedFile.size,
           contentType: selectedFile.type,
-          isPublic: false,
-          processingStatus: "completed",
         })
       } else if (mediaType === "video") {
         if (!youtubeId || !previewUrl) throw new Error("YouTube metadata not fetched.")
@@ -178,9 +178,6 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
           embedUrl: youtubeUrl,
           youtubeId,
           duration,
-          thumbnailUrl: previewUrl,
-          isPublic: false,
-          processingStatus: "completed",
         })
       }
 
@@ -204,12 +201,12 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
         {/* Preview Section */}
         <div className="h-40 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
           {previewUrl && mediaType === "video" ? (
-            <Image 
-              src={previewUrl} 
-              alt={title} 
-              width={400} 
-              height={160} 
-              className="w-full h-full object-cover" 
+            <Image
+              src={previewUrl}
+              alt={title}
+              width={400}
+              height={160}
+              className="w-full h-full object-cover"
             />
           ) : selectedFile && mediaType === "audio" ? (
             <div className="text-center text-muted-foreground p-4">

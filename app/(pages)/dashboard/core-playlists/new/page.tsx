@@ -6,14 +6,14 @@ import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Id } from "@/convex/_generated/dataModel"
-import { PlaylistForm } from "../_components/playlist-form"
+import CorePlaylistForm from "../_components/playlist-form"
 
 export default function NewCorePlaylistPage() {
   const router = useRouter()
 
-  const handleSuccess = (playlistId: Id<"corePlaylists">) => {
+  const handleSuccess = (corePlaylistId: Id<"corePlaylists">) => {
     // Redirect to the edit page immediately after successful creation
-    router.push(`/dashboard/core-playlists/${playlistId}/edit`)
+    router.push(`/dashboard/core-playlists/${corePlaylistId}/edit`)
   }
 
   return (
@@ -30,7 +30,7 @@ export default function NewCorePlaylistPage() {
         </div>
       </div>
 
-      <PlaylistForm
+      <CorePlaylistForm
         onSuccess={handleSuccess}
         submitLabel="Create Core Playlist"
       />

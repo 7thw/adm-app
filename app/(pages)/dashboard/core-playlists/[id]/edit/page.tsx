@@ -3,22 +3,13 @@
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
 import { useMutation, useQuery } from "convex/react"
-import { useState, useEffect } from "react"
 import { ArrowLeftIcon, SaveIcon } from "lucide-react"
-import { useRouter, useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -27,19 +18,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 
 // Main component for editing core playlists
 export default function CorePlaylistEditPage() {
   // Router for navigation
   const router = useRouter()
   const params = useParams()
-  const playlistId = params.id as Id<"corePlaylists">
+  const corePlaylistId = params.id as Id<"corePlaylists">
 
   // State for core playlist data
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [categoryId, setCategoryId] = useState<Id<"playlistCategories"> | null>(null)
+  const [categoryId, setCategoryId] = useState<Id<"coreCategories"> | null>(null)
   const [status, setStatus] = useState<"draft" | "published">("draft")
 
   // UI state
@@ -53,18 +53,18 @@ export default function CorePlaylistEditPage() {
   const deleteCorePlaylistMutation = useMutation(api.admin.deleteCorePlaylist)
 
   // Fetch core playlist data
-  const corePlaylists = useQuery(api.admin.listCorePlaylists)
-  const corePlaylist = corePlaylists?.find((p: any) => p._id === playlistId)
+  const corePlaylists = useQuery(api.admin.listCorePlaylists, {})
+  const corePlaylist = corePlaylists?.find((p: any) => p._id === corePlaylistId)
 
   // Fetch categories
-  const categories = useQuery(api.admin.listPlaylistCategories)
+  const categories = useQuery(api.admin.listCoreCategories, {})
 
   // Initialize data when it's loaded
   useEffect(() => {
     if (corePlaylist) {
       setTitle(corePlaylist.title)
       setDescription(corePlaylist.description || "")
-      setCategoryId(corePlaylist.categoryId as Id<"playlistCategories">)
+      setCategoryId(corePlaylist.categoryId as Id<"coreCategories">)
       setStatus(corePlaylist.status as "draft" | "published")
     }
   }, [corePlaylist])
@@ -77,7 +77,7 @@ export default function CorePlaylistEditPage() {
 
     try {
       await updateCorePlaylistMutation({
-        playlistId: corePlaylist._id,
+        corePlaylistId: corePlaylist._id,
         title,
         description,
         categoryId,
@@ -106,7 +106,7 @@ export default function CorePlaylistEditPage() {
 
     try {
       await deleteCorePlaylistMutation({
-        playlistId: corePlaylist._id
+        corePlaylistId: corePlaylist._id
       })
 
       toast.success("Core playlist deleted successfully")
@@ -192,7 +192,7 @@ export default function CorePlaylistEditPage() {
               <Label htmlFor="category">Category</Label>
               <Select
                 value={categoryId ? categoryId.toString() : ""}
-                onValueChange={(value) => setCategoryId(value as Id<"playlistCategories">)}
+                onValueChange={(value) => setCategoryId(value as Id<"coreCategories">)}
               >
                 <SelectTrigger id="category">
                   <SelectValue placeholder="Select a category" />

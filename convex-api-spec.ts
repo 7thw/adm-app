@@ -27,19 +27,19 @@ export type PublicApiType = {
     addMediaTag: FunctionReference<
       "mutation",
       "public",
-      { mediaId: Id<"medias">; tag: string },
+      { coreMediaId: Id<"medias">; tag: string },
       any
     >;
     removeMediaTag: FunctionReference<
       "mutation",
       "public",
-      { mediaId: Id<"medias">; tag: string },
+      { coreMediaId: Id<"medias">; tag: string },
       any
     >;
     getMediaTags: FunctionReference<
       "query",
       "public",
-      { mediaId: Id<"medias"> },
+      { coreMediaId: Id<"medias"> },
       any
     >;
     searchMediaByTags: FunctionReference<
@@ -78,9 +78,9 @@ export type PublicApiType = {
       "public",
       {
         bitrate?: number;
+        coreMediaId: Id<"medias">;
         description?: string;
         isPublic?: boolean;
-        mediaId: Id<"medias">;
         quality?: string;
         thumbnailStorageId?: Id<"_storage">;
         thumbnailUrl?: string;
@@ -93,7 +93,7 @@ export type PublicApiType = {
     deleteMedia: FunctionReference<
       "mutation",
       "public",
-      { mediaId: Id<"medias"> },
+      { coreMediaId: Id<"medias"> },
       any
     >;
     updateMediaMetadata: FunctionReference<
@@ -102,9 +102,9 @@ export type PublicApiType = {
       {
         bitrate?: number;
         contentType?: string;
+        coreMediaId: Id<"medias">;
         duration?: number;
         fileSize?: number;
-        mediaId: Id<"medias">;
         processingStatus?: "pending" | "processing" | "completed" | "failed";
         quality?: string;
         storageId?: Id<"_storage">;
@@ -113,6 +113,12 @@ export type PublicApiType = {
         transcript?: string;
         waveformData?: string;
       },
+      any
+    >;
+    generateUploadUrl: FunctionReference<
+      "mutation",
+      "public",
+      Record<string, never>,
       any
     >;
     listCorePlaylists: FunctionReference<
@@ -127,66 +133,79 @@ export type PublicApiType = {
       {
         categoryId: Id<"coreCategories">;
         description?: string;
-        difficulty?: "beginner" | "intermediate" | "advanced";
+        thumbnailStorageId?: Id<"_storage">;
         title: string;
+      },
+      any
+    >;
+    updateCorePlaylist: FunctionReference<
+      "mutation",
+      "public",
+      {
+        categoryId?: Id<"coreCategories">;
+        corePlaylistId: Id<"corePlaylists">;
+        description?: string;
+        status?: "draft" | "published";
+        thumbnailStorageId?: Id<"_storage">;
+        title?: string;
       },
       any
     >;
     publishCorePlaylist: FunctionReference<
       "mutation",
       "public",
-      { playlistId: Id<"corePlaylists"> },
+      { corePlaylistId: Id<"corePlaylists"> },
       any
     >;
     createCoreSection: FunctionReference<
       "mutation",
       "public",
       {
+        corePlaylistId: Id<"corePlaylists">;
         description?: string;
         isRequired?: boolean;
         maxSelectMedia: number;
         minSelectMedia: number;
-        playlistId: Id<"corePlaylists">;
         sectionType: "base" | "loop";
         title: string;
       },
       any
     >;
-    addMediaToSection: FunctionReference<
+    addMediaToCoreSection: FunctionReference<
       "mutation",
       "public",
       {
+        coreMediaId: Id<"medias">;
+        coreSectionId: Id<"coreSections">;
         defaultSelected?: boolean;
         isOptional?: boolean;
-        mediaId: Id<"medias">;
-        sectionId: Id<"coreSections">;
       },
       any
     >;
     listCoreSections: FunctionReference<
       "query",
       "public",
-      { playlistId?: Id<"corePlaylists"> },
+      { corePlaylistId?: Id<"corePlaylists"> },
       any
     >;
     updateCoreSection: FunctionReference<
       "mutation",
       "public",
       {
+        coreSectionId: Id<"coreSections">;
         description?: string;
         isRequired?: boolean;
         maxSelectMedia?: number;
         minSelectMedia?: number;
-        sectionId: Id<"coreSections">;
         sectionType?: "base" | "loop";
         title?: string;
       },
       any
     >;
-    removeCoreSection: FunctionReference<
+    deleteCoreSection: FunctionReference<
       "mutation",
       "public",
-      { sectionId: Id<"coreSections"> },
+      { coreSectionId: Id<"coreSections"> },
       any
     >;
     reorderCoreSections: FunctionReference<
@@ -195,23 +214,10 @@ export type PublicApiType = {
       { sectionOrders: Array<{ id: Id<"coreSections">; order: number }> },
       any
     >;
-    updateCorePlaylist: FunctionReference<
-      "mutation",
-      "public",
-      {
-        categoryId?: Id<"coreCategories">;
-        description?: string;
-        difficulty?: "beginner" | "intermediate" | "advanced";
-        playlistId: Id<"corePlaylists">;
-        thumbnailStorageId?: Id<"_storage">;
-        title?: string;
-      },
-      any
-    >;
     deleteCorePlaylist: FunctionReference<
       "mutation",
       "public",
-      { playlistId: Id<"corePlaylists"> },
+      { corePlaylistId: Id<"corePlaylists"> },
       any
     >;
     duplicateCorePlaylist: FunctionReference<
@@ -225,38 +231,41 @@ export type PublicApiType = {
       },
       any
     >;
-    updatePlaylistThumbnail: FunctionReference<
-      "mutation",
-      "public",
-      { playlistId: Id<"corePlaylists">; thumbnailStorageId?: Id<"_storage"> },
-      any
-    >;
-    batchAddMediasToSection: FunctionReference<
+    updateCorePlaylistThumbnail: FunctionReference<
       "mutation",
       "public",
       {
-        mediaIds: Array<Id<"medias">>;
-        sectionId: Id<"coreSections">;
+        corePlaylistId: Id<"corePlaylists">;
+        thumbnailStorageId?: Id<"_storage">;
+      },
+      any
+    >;
+    addMediasToCoreSectionBatch: FunctionReference<
+      "mutation",
+      "public",
+      {
+        coreMediaIds: Array<Id<"medias">>;
+        coreSectionId: Id<"coreSections">;
         startOrder?: number;
       },
       any
     >;
-    batchRemoveMediasFromSection: FunctionReference<
+    removeMediasFromCoreSection: FunctionReference<
       "mutation",
       "public",
-      { mediaIds: Array<Id<"medias">>; sectionId: Id<"coreSections"> },
+      { coreMediaIds: Array<Id<"medias">>; coreSectionId: Id<"coreSections"> },
       any
     >;
     getPlaylistPreview: FunctionReference<
       "query",
       "public",
-      { playlistId: Id<"corePlaylists"> },
+      { corePlaylistId: Id<"corePlaylists"> },
       any
     >;
-    getPlaylistStats: FunctionReference<
+    getCorePlaylistStats: FunctionReference<
       "query",
       "public",
-      { playlistId: Id<"corePlaylists"> },
+      { corePlaylistId: Id<"corePlaylists"> },
       any
     >;
   };
@@ -283,18 +292,20 @@ export type PublicApiType = {
     signOut: FunctionReference<"action", "public", Record<string, never>, any>;
   };
   subscribers: {
-    getPublishedPlaylists: FunctionReference<
+    getPublishedCorePlaylists: FunctionReference<
       "query",
       "public",
       { categoryId?: Id<"coreCategories"> },
       any
     >;
-    getPlaylistDetails: FunctionReference<
+    getCorePlaylistDetails: FunctionReference<
       "query",
       "public",
-      { playlistId: Id<"corePlaylists"> },
+      { corePlaylistId: Id<"corePlaylists"> },
       any
     >;
+    debugUserAuth: FunctionReference<"query", "public", any, any>;
+    ensureUserProfile: FunctionReference<"mutation", "public", any, any>;
     getUserPlaylists: FunctionReference<
       "query",
       "public",
@@ -359,22 +370,69 @@ export type PublicApiType = {
     >;
   };
   r2Upload: {
-    getMediaById: FunctionReference<
+    createCoreMediaRecord: FunctionReference<
+      "mutation",
+      "public",
+      {
+        contentType?: string;
+        description?: string;
+        duration: number;
+        fileSize?: number;
+        mediaType: "audio" | "video";
+        r2Key: string;
+        title: string;
+      },
+      any
+    >;
+    generateUploadUrl: FunctionReference<
+      "mutation",
+      "public",
+      Record<string, never>,
+      { key: string; url: string }
+    >;
+    syncMetadata: FunctionReference<
+      "mutation",
+      "public",
+      { key: string },
+      null
+    >;
+  };
+  analytics: {
+    trackInstallEvent: FunctionReference<
+      "mutation",
+      "public",
+      {
+        context?: string;
+        event: string;
+        platform?: string;
+        sessionId?: string;
+        timestamp?: number;
+        userAgent?: string;
+        variant?: string;
+      },
+      any
+    >;
+    getInstallAnalytics: FunctionReference<
       "query",
       "public",
-      { mediaId: Id<"medias"> },
+      { groupBy?: string; timeframe?: string },
       any
     >;
-    getMediaStreamUrl: FunctionReference<
-      "mutation",
+    getInstallAnalyticsDetail: FunctionReference<
+      "query",
       "public",
-      { mediaId: Id<"medias"> },
+      {
+        endDate: number;
+        platform?: string;
+        startDate: number;
+        variant?: string;
+      },
       any
     >;
-    getMediaDownloadUrl: FunctionReference<
+    trackUserEvent: FunctionReference<
       "mutation",
       "public",
-      { mediaId: Id<"medias"> },
+      { event: string; properties?: any; sessionId?: string },
       any
     >;
   };

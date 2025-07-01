@@ -18,21 +18,21 @@ interface PreviewPageProps {
   }>
 }
 
-export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
+export default function CorePlaylistPreviewPage({ params }: PreviewPageProps) {
   const router = useRouter()
-  
+
   // Use React.use() to unwrap the params promise
   const unwrappedParams = React.use(params) as { id: string }
   const id = unwrappedParams.id
 
-  // Fetch playlist preview data - moved before validation to fix React Hooks rule
-  const playlistPreview = useQuery(api.admin.getPlaylistPreview, { 
-    playlistId: id as Id<"corePlaylists"> 
+  // Fetch core playlist preview data - moved before validation to fix React Hooks rule
+  const corePlaylistPreview = useQuery(api.admin.getPlaylistPreview, {
+    corePlaylistId: id as Id<"corePlaylists">
   })
-  
-  // Fetch playlist stats
-  const playlistStats = useQuery(api.admin.getPlaylistStats, { 
-    playlistId: id as Id<"corePlaylists"> 
+
+  // Fetch core playlist stats
+  const corePlaylistStats = useQuery(api.admin.getCorePlaylistStats, {
+    corePlaylistId: id as Id<"corePlaylists">
   })
 
   // Check if id is valid
@@ -41,7 +41,7 @@ export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
   }
 
   // Loading state
-  if (playlistPreview === undefined || playlistStats === undefined) {
+  if (corePlaylistPreview === undefined || corePlaylistStats === undefined) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <LoaderIcon className="h-8 w-8 animate-spin text-primary" />
@@ -50,7 +50,7 @@ export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
   }
 
   // Not found state
-  if (!playlistPreview) {
+  if (!corePlaylistPreview) {
     return (
       <div className="container mx-auto py-8">
         <div className="text-center">
@@ -67,13 +67,13 @@ export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const totalMediaCount = playlistPreview.sections.reduce(
-    (total, section) => total + section.medias.length, 0
+  const totalMediaCount = corePlaylistPreview.sections.reduce(
+    (total: number, section: any) => total + section.medias.length, 0
   )
 
-  const totalDuration = playlistPreview.sections.reduce(
-    (total, section) => total + section.medias.reduce(
-      (sectionTotal, media) => sectionTotal + (media.media?.duration || 0), 0
+  const totalDuration = corePlaylistPreview.sections.reduce(
+    (total: number, section: any) => total + section.medias.reduce(
+      (sectionTotal: number, media: any) => sectionTotal + (media.media?.duration || 0), 0
     ), 0
   )
 
@@ -81,9 +81,9 @@ export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
     <div className="container mx-auto py-8 max-w-4xl">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <Button 
-          variant="outline" 
-          size="icon" 
+        <Button
+          variant="outline"
+          size="icon"
           onClick={() => router.push(`/dashboard/core-playlists/${id}`)}
         >
           <ArrowLeftIcon className="h-4 w-4" />
@@ -100,26 +100,26 @@ export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="space-y-2">
-              <CardTitle className="text-2xl">{playlistPreview.title}</CardTitle>
+              <CardTitle className="text-2xl">{corePlaylistPreview.title}</CardTitle>
               <CardDescription className="text-base">
-                {playlistPreview.description}
+                {corePlaylistPreview.description}
               </CardDescription>
               <div className="flex items-center gap-4">
-                <Badge variant={playlistPreview.status === "published" ? "default" : "outline"}>
-                  {playlistPreview.status === "published" ? "Published" : "Draft"}
+                <Badge variant={corePlaylistPreview.status === "published" ? "default" : "outline"}>
+                  {corePlaylistPreview.status === "published" ? "Published" : "Draft"}
                 </Badge>
                 <span className="text-sm text-muted-foreground">
-                  Category: {playlistPreview.category?.name || "Unknown"}
+                  Category: {corePlaylistPreview.category?.name || "Unknown"}
                 </span>
-                {playlistPreview.difficulty && (
+                {corePlaylistPreview.difficulty && (
                   <Badge variant="secondary" className="capitalize">
-                    {playlistPreview.difficulty}
+                    {corePlaylistPreview.difficulty}
                   </Badge>
                 )}
               </div>
             </div>
-            
-            {playlistPreview.thumbnailStorageId && (
+
+            {corePlaylistPreview.thumbnailStorageId && (
               <div className="w-24 h-24 rounded-lg bg-muted border overflow-hidden">
                 <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
                   <PlayIcon className="h-8 w-8 text-primary" />
@@ -135,11 +135,11 @@ export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
         <Card>
           <CardContent className="p-4 text-center">
             <Layers className="h-6 w-6 mx-auto mb-2 text-primary" />
-            <div className="text-2xl font-bold">{playlistStats?.sectionsCount || 0}</div>
+            <div className="text-2xl font-bold">{corePlaylistStats?.sectionsCount || 0}</div>
             <div className="text-sm text-muted-foreground">Sections</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4 text-center">
             <PlayIcon className="h-6 w-6 mx-auto mb-2 text-primary" />
@@ -147,7 +147,7 @@ export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
             <div className="text-sm text-muted-foreground">Media Items</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4 text-center">
             <Clock className="h-6 w-6 mx-auto mb-2 text-primary" />
@@ -155,11 +155,11 @@ export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
             <div className="text-sm text-muted-foreground">Duration</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4 text-center">
             <Users className="h-6 w-6 mx-auto mb-2 text-primary" />
-            <div className="text-2xl font-bold">{playlistStats?.userPlaylistsCount || 0}</div>
+            <div className="text-2xl font-bold">{corePlaylistStats?.userPlaylistsCount || 0}</div>
             <div className="text-sm text-muted-foreground">User Copies</div>
           </CardContent>
         </Card>
@@ -174,7 +174,7 @@ export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {playlistPreview.sections.map((section, index) => (
+          {corePlaylistPreview.sections.map((section: any, index: any) => (
             <div key={section._id} className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
@@ -192,18 +192,18 @@ export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
                   </Badge>
                 </div>
               </div>
-              
+
               {/* Media Items */}
               <div className="grid gap-2 pl-4">
-                {section.medias.map((media) => (
-                  <div 
-                    key={media._id} 
+                {section.medias.map((media: any) => (
+                  <div
+                    key={media._id}
                     className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/20 transition-colors"
                   >
                     <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center">
                       <PlayIcon className="h-4 w-4 text-primary" />
                     </div>
-                    
+
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">
                         {media.media?.title || "Unknown Media"}
@@ -218,7 +218,7 @@ export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       {media.defaultSelected && (
                         <Badge variant="default" className="text-xs">
@@ -233,21 +233,21 @@ export default function PlaylistPreviewPage({ params }: PreviewPageProps) {
                     </div>
                   </div>
                 ))}
-                
+
                 {section.medias.length === 0 && (
                   <div className="text-center py-4 text-muted-foreground">
                     No media items in this section
                   </div>
                 )}
               </div>
-              
-              {index < playlistPreview.sections.length - 1 && (
+
+              {index < corePlaylistPreview.sections.length - 1 && (
                 <Separator className="mt-4" />
               )}
             </div>
           ))}
-          
-          {playlistPreview.sections.length === 0 && (
+
+          {corePlaylistPreview.sections.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               No sections found. Add sections to see them here.
             </div>

@@ -1,29 +1,43 @@
-import { action, mutation, query } from "./_generated/server"
+import { mutation } from "./_generated/server"
 import { v } from "convex/values"
+import { R2 } from "@convex-dev/r2"
+import { components } from "./_generated/api"
 
-// --- UPLOAD FUNCTIONS ---
-// Standard Convex file upload functions
+// --- OFFICIAL CONVEX R2 COMPONENT ---
+// Using the official Convex R2 component for file uploads
 
-/**
- * Generates a pre-signed URL for uploading a file to Convex storage.
- */
-export const generateUploadUrl = mutation({
-  args: {
-    // Optional custom filename
-    filename: v.optional(v.string()),
+// Instantiate R2 component client
+export const r2 = new R2(components.r2)
+
+// Export the official R2 client API with upload validation and callbacks
+export const { generateUploadUrl, syncMetadata } = r2.clientApi({
+  checkUpload: async (ctx, bucket) => {
+    // Validate that the user can upload to this bucket
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      throw new Error("Authentication required for upload")
+    }
+    
+    // Additional validation can be added here (e.g., subscription status, file limits)
+    // checkUpload should not return a value, just throw if invalid
   },
-  handler: async (ctx, args) => {
-    // Generate upload URL using Convex's built-in storage
-    return await ctx.storage.generateUploadUrl()
+  onUpload: async (ctx, key) => {
+    // This runs in the syncMetadata mutation after upload
+    // We can create relations between the R2 key and our database here
+    console.log(`File uploaded with key: ${key}`)
+    
+    // The actual media record creation will be handled separately
+    // in createCoreMediaRecord to maintain our ultra-strict naming
   },
 })
 
 /**
- * Create a media record after file upload is complete.
+ * Create a core media record after R2 file upload is complete.
+ * Uses ultra-strict naming convention.
  */
-export const createMediaRecord = mutation({
+export const createCoreMediaRecord = mutation({
   args: {
-    storageId: v.id("_storage"),
+    r2Key: v.string(),
     title: v.string(),
     description: v.optional(v.string()),
     mediaType: v.union(v.literal("audio"), v.literal("video")),
@@ -38,12 +52,14 @@ export const createMediaRecord = mutation({
       throw new Error("Authentication required")
     }
 
-    // Create media record
-    const mediaId = await ctx.db.insert("medias", {
+    // Create core media record with R2 data
+    // Note: We store only the r2Key, not r2Url (which would expire)
+    // Signed URLs should be generated dynamically when media is accessed
+    const coreMediaId = await ctx.db.insert("medias", {
       title: args.title,
       description: args.description,
       mediaType: args.mediaType,
-      storageId: args.storageId,
+      r2Key: args.r2Key,
       duration: args.duration,
       fileSize: args.fileSize,
       contentType: args.contentType,
@@ -52,127 +68,15 @@ export const createMediaRecord = mutation({
       isPublic: false,
     })
 
-    return { mediaId }
+    return { coreMediaId }
   },
 })
 
-// --- EXISTING MEDIA FUNCTIONS ---
-// These were in the original file and are kept for now to avoid breaking changes.
-// TODO: Consider moving these to a more appropriate file like `convex/media.ts` or `convex/admin.ts`.
+// Note: syncMetadata is already exported from r2.clientApi above
+// The R2 component handles all metadata operations automatically
+// All legacy media functions have been removed.
+// Media access should generate signed URLs dynamically using the r2Key.
+// The r2Url field has been removed to prevent expiration issues.
 
-/**
- * Get a media document by ID
- */
-export const getMediaById = query({
-  args: { mediaId: v.id("medias") },
-  handler: async (ctx, args) => {
-    return await ctx.db.get(args.mediaId)
-  },
-})
-
-/**
- * Generate a streaming URL for media content with authentication and subscription validation
- * This URL is time-limited and intended for streaming media in the browser
- */
-export const getMediaStreamUrl = mutation({
-  args: {
-    mediaId: v.id("medias"),
-  },
-  handler: async (ctx, { mediaId }) => {
-    // Get the media document
-    const media = await ctx.db.get(mediaId)
-    if (!media) {
-      throw new Error("Media not found")
-    }
-
-    // Check if user has access to this media
-    const identity = await ctx.auth.getUserIdentity()
-    if (!identity) {
-      throw new Error("Authentication required")
-    }
-
-    // Get user profile to check subscription status
-    const clerkId = identity.tokenIdentifier.split("|")[1]
-    const userProfile = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", clerkId))
-      .unique()
-
-    if (!userProfile) {
-      throw new Error("User profile not found")
-    }
-
-    // Check if media is public or user has active subscription
-    if (
-      !media.isPublic &&
-      userProfile.role !== "admin" &&
-      userProfile.subscriptionStatus !== "active"
-    ) {
-      throw new Error("Active subscription required to access this media")
-    }
-
-    // Check if media has storage ID
-    if (!media.storageId) {
-      throw new Error("Media has no associated storage")
-    }
-
-    // Generate a signed URL with 15 minute expiration (default)
-    const url = await ctx.storage.getUrl(media.storageId)
-
-    return { url }
-  },
-})
-
-/**
- * Generate a download URL for media content with authentication and subscription validation
- * This URL has a longer expiration time and is intended for offline downloads
- */
-export const getMediaDownloadUrl = mutation({
-  args: {
-    mediaId: v.id("medias"),
-  },
-  handler: async (ctx, { mediaId }) => {
-    // Get the media document
-    const media = await ctx.db.get(mediaId)
-    if (!media) {
-      throw new Error("Media not found")
-    }
-
-    // Check if user has access to this media
-    const identity = await ctx.auth.getUserIdentity()
-    if (!identity) {
-      throw new Error("Authentication required")
-    }
-
-    // Get user profile to check subscription status
-    const clerkId = identity.tokenIdentifier.split("|")[1]
-    const userProfile = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", clerkId))
-      .unique()
-
-    if (!userProfile) {
-      throw new Error("User profile not found")
-    }
-
-    // Check if media is public or user has active subscription
-    if (
-      !media.isPublic &&
-      userProfile.role !== "admin" &&
-      userProfile.subscriptionStatus !== "active"
-    ) {
-      throw new Error("Active subscription required to access this media")
-    }
-
-    // Check if media has storage ID
-    if (!media.storageId) {
-      throw new Error("Media has no associated storage")
-    }
-
-    // Generate a signed URL for access.
-    const url = await ctx.storage.getUrl(media.storageId)
-
-    // The fileName can be used by the client to suggest a name for the downloaded file.
-    return { url, fileName: media.title || "media-download" }
-  },
-})
+// If additional media access functions are needed, they should be implemented
+// in convex/admin.ts or a dedicated convex/media.ts file.

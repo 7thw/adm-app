@@ -71,13 +71,13 @@ export const getPublishedCorePlaylists = query({
           sections.map(async (section) => {
             const sectionMedias = await ctx.db
               .query("sectionMedias")
-              .withIndex("by_section_order", (q) => q.eq("sectionId", section._id))
+              .withIndex("by_core_section_order", (q) => q.eq("coreSectionId", section._id))
               .order("asc")
               .collect();
 
             const medias = await Promise.all(
               sectionMedias.map(async (sm) => {
-                const media = await ctx.db.get(sm.mediaId);
+                const media = await ctx.db.get(sm.coreMediaId);
                 if (!media) return null;
 
                 return {
@@ -112,19 +112,19 @@ export const getPublishedCorePlaylists = query({
 });
 
 export const getCorePlaylistDetails = query({
-  args: { playlistId: v.id("corePlaylists") },
+  args: { corePlaylistId: v.id("corePlaylists") },
   handler: async (ctx, args): Promise<any> => {
     await requireSubscriberAccess(ctx);
 
-    const playlist = await ctx.db.get(args.playlistId);
-    if (!playlist || playlist.status !== "published") {
+    const corePlaylist = await ctx.db.get(args.corePlaylistId);
+    if (!corePlaylist || corePlaylist.status !== "published") {
       throw new Error("Core playlist not found or not published");
     }
 
     // Get sections with media
     const sections = await ctx.db
       .query("coreSections")
-      .withIndex("by_core_playlist_order", (q) => q.eq("corePlaylistId", args.playlistId))
+      .withIndex("by_core_playlist_order", (q) => q.eq("corePlaylistId", args.corePlaylistId))
       .order("asc")
       .collect();
 
@@ -132,13 +132,13 @@ export const getCorePlaylistDetails = query({
       sections.map(async (section) => {
         const sectionMedias = await ctx.db
           .query("sectionMedias")
-          .withIndex("by_section_order", (q) => q.eq("sectionId", section._id))
+          .withIndex("by_core_section_order", (q) => q.eq("coreSectionId", section._id))
           .order("asc")
           .collect();
 
         const medias = await Promise.all(
           sectionMedias.map(async (sm) => {
-            const media = await ctx.db.get(sm.mediaId);
+            const media = await ctx.db.get(sm.coreMediaId);
             if (!media) return null;
 
             return {
@@ -164,7 +164,7 @@ export const getCorePlaylistDetails = query({
     );
 
     return {
-      ...playlist,
+      ...corePlaylist,
       sections: sectionsWithMedia,
     };
   },

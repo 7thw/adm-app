@@ -113,7 +113,7 @@ export interface DashboardItem {
   isRequired: boolean; // equivalent to status in old schema
   minSelectMedia?: number; // equivalent to target in old schema
   maxSelectMedia?: number; // equivalent to limit in old schema
-  playlistId?: string; // equivalent to reviewer in old schema
+  corePlaylistId?: string; // equivalent to reviewer in old schema
   // Include any other fields needed for UI display
 }
 
@@ -253,13 +253,13 @@ const columns: ColumnDef<DashboardItem>[] = [
     ),
   },
   {
-    accessorKey: "playlistId",
-    header: "Playlist ID",
+    accessorKey: "corePlaylistId",
+    header: "Core Playlist ID",
     cell: ({ row }) => {
-      const isAssigned = row.original.playlistId !== undefined
+      const isAssigned = row.original.corePlaylistId !== undefined
 
       if (isAssigned) {
-        return row.original.playlistId
+        return row.original.corePlaylistId
       }
 
       return (
@@ -781,7 +781,7 @@ function TableCellViewer({ item }: { item: DashboardItem }) {
             </div>
             <div className="flex flex-col gap-3">
               <Label htmlFor="reviewer">Reviewer</Label>
-              <Select defaultValue={item.playlistId}>
+              <Select defaultValue={item.corePlaylistId}>
                 <SelectTrigger id="reviewer" className="w-full">
                   <SelectValue placeholder="Select a reviewer" />
                 </SelectTrigger>
