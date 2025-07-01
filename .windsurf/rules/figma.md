@@ -1,0 +1,12 @@
+---
+trigger: model_decision
+description: Figma Rules
+---
+
+- IMPORTANT: Always use components from `/path_to_your_design_system` when possible
+- Prioritize Figma fidelity to match designs exactly
+- Avoid hardcoded values, use design tokens from Figma where available
+- Follow WCAG requirements for accessibility
+- Add component documentation
+- Place UI components in `/path_to_your_design_system`; avoid inline styles unless truly necessary
+- Add CSS [.class-name] or CSS [#id-name] + Tailwind 4 CSS Syntax when naming Figma layers and components.

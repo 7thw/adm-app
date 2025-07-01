@@ -36,9 +36,6 @@ export default function AddSectionForm({ corePlaylistId }: AddSectionFormProps) 
     setIsLoading(true);
 
     try {
-      // Get the highest order value to add the new section at the end
-      const order = 1000; // This is a placeholder - in a real app you'd query for the highest order
-
       await createSection({
         playlistId: corePlaylistId,
         title,

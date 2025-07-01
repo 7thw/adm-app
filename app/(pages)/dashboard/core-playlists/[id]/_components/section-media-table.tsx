@@ -14,12 +14,19 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useMutation, useQuery } from "convex/react"
-import { Check, GripVertical, PlayCircle, Sparkles, Trash2 } from "lucide-react"
+import { Check, GripVertical, Minus, PlayCircle, Plus, Sparkles, Trash2 } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -31,11 +38,6 @@ import { Doc } from "@/convex/_generated/dataModel"
 // Use Convex-generated types as source of truth
 type MediaDetails = Doc<"medias">
 // SectionMediaRaw represents the join table between sections and media
-
-  uploadedBy: Id<"users">
-  isPublic: boolean
-  _creationTime: number
-}
 
 // Use Convex schema directly instead of custom type definitions
 // This avoids redundant type definitions that can drift from the schema
@@ -135,6 +137,12 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
   // State for tracking selected count
   const [selectedCount, setSelectedCount] = useState(0)
 
+  // State for batch operations
+  const [batchSelectedIds, setBatchSelectedIds] = useState<Set<Id<"sectionMedias">>>(new Set())
+  const [showBatchActions, setShowBatchActions] = useState(false)
+  const [availableMediaForBatch, setAvailableMediaForBatch] = useState<Doc<"medias">[]>([])
+  const [showMediaSelector, setShowMediaSelector] = useState(false)
+
   // Sensors for drag and drop
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -174,9 +182,13 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
   }, [sectionMedias])
 
   // Mutations
-  const updateSelection = useMutation(api.coreSectionMedia.updateSelection)
-  const reorderMedia = useMutation(api.coreSectionMedia.reorderMedia)
-  const removeMedia = useMutation(api.coreSectionMedia.removeMedia)
+  const updateSelection = useMutation(api.admin.updateSectionMediaSelection)
+  const reorderMedia = useMutation(api.admin.reorderSectionMedia)
+  const removeMedia = useMutation(api.admin.removeSectionMedia)
+
+  // Batch operations mutations
+  const batchAddMedias = useMutation(api.admin.batchAddMediasToSection)
+  const batchRemoveMedias = useMutation(api.admin.batchRemoveMediasFromSection)
 
   // Handle media drag end
   const handleDragEnd = (event: DragEndEvent) => {
@@ -245,6 +257,69 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
     }
   }
 
+  // Batch operation handlers
+  const handleBatchSelect = (id: Id<"sectionMedias">, selected: boolean) => {
+    const newSelection = new Set(batchSelectedIds)
+    if (selected) {
+      newSelection.add(id)
+    } else {
+      newSelection.delete(id)
+    }
+    setBatchSelectedIds(newSelection)
+    setShowBatchActions(newSelection.size > 0)
+  }
+
+  const handleBatchSelectAll = () => {
+    const allIds = new Set(sortedMedia.map(item => item._id))
+    setBatchSelectedIds(allIds)
+    setShowBatchActions(true)
+  }
+
+  const handleBatchClear = () => {
+    setBatchSelectedIds(new Set())
+    setShowBatchActions(false)
+  }
+
+  const handleBatchRemove = async () => {
+    if (batchSelectedIds.size === 0) return
+
+    try {
+      const mediaIds = Array.from(batchSelectedIds).map(id => {
+        const item = sortedMedia.find(media => media._id === id)
+        return item?.mediaId
+      }).filter(Boolean) as Id<"medias">[]
+
+      await batchRemoveMedias({
+        sectionId,
+        mediaIds
+      })
+
+      toast.success(`Removed ${batchSelectedIds.size} media items`)
+      handleBatchClear()
+    } catch (error) {
+      console.error("Error batch removing media:", error)
+      toast.error("Failed to remove selected media")
+    }
+  }
+
+  const handleBatchAdd = async (selectedMediaIds: Id<"medias">[]) => {
+    if (selectedMediaIds.length === 0) return
+
+    try {
+      const result = await batchAddMedias({
+        sectionId,
+        mediaIds: selectedMediaIds
+      })
+
+      toast.success(`Added ${result.addedCount} media items` +
+        (result.skippedCount > 0 ? ` (${result.skippedCount} already existed)` : ""))
+      setShowMediaSelector(false)
+    } catch (error) {
+      console.error("Error batch adding media:", error)
+      toast.error("Failed to add selected media")
+    }
+  }
+
   if (sortedMedia.length === 0) {
     return (
       <div className="text-center p-4 border rounded-md bg-muted/10">
@@ -262,13 +337,73 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
       <div className="border rounded-md overflow-hidden">
         <div className="bg-muted/20 p-2 text-sm border-b">
           <div className="flex justify-between items-center">
-            <span>Selected: {selectedCount} (No limit in edit mode)</span>
-            {selectedCount > 0 && (
-              <Badge variant="default">
-                <Check className="h-3 w-3 mr-1" />
-                {selectedCount} selected
-              </Badge>
-            )}
+            <div className="flex items-center gap-4">
+              <span>Selected: {selectedCount} (No limit in edit mode)</span>
+              {showBatchActions && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    {batchSelectedIds.size} items selected for batch operations
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBatchRemove}
+                    className="gap-1"
+                  >
+                    <Minus className="h-3 w-3" />
+                    Remove Selected
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBatchClear}
+                  >
+                    Clear Selection
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {selectedCount > 0 && (
+                <Badge variant="default">
+                  <Check className="h-3 w-3 mr-1" />
+                  {selectedCount} selected
+                </Badge>
+              )}
+
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowMediaSelector(true)}
+                  className="gap-1"
+                >
+                  <Plus className="h-3 w-3" />
+                  Add Media
+                </Button>
+
+                {!showBatchActions ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBatchSelectAll}
+                    className="gap-1"
+                  >
+                    <Select className="h-3 w-3" />
+                    Select All
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBatchClear}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

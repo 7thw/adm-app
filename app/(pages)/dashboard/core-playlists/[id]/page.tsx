@@ -29,12 +29,6 @@ type PlaylistSection = Doc<"coreSections"> & {
   id?: number;
 }
 
-// This matches the DataTableProps interface in the data-table.tsx component
-interface DataTableProps {
-  data: PlaylistSection[]
-  columns?: ColumnDef<PlaylistSection>[]
-}
-
 // Define column configuration for the data table
 const columns: ColumnDef<PlaylistSection>[] = [
   {
@@ -53,7 +47,7 @@ const columns: ColumnDef<PlaylistSection>[] = [
             <SheetHeader>
               <SheetTitle>Edit Section</SheetTitle>
               <SheetDescription>
-                Make changes to the section here. Click save when you're done.
+                Make changes to the section here. Click save when you&apos;re done.
               </SheetDescription>
             </SheetHeader>
             <div className="grid gap-4 py-4">
@@ -154,14 +148,18 @@ export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
   const unwrappedParams = React.use(params) as { id: string }
   const id = unwrappedParams.id
 
+  // Fetch all playlists from Convex and filter client-side for the specific playlist
+  const playlists = useQuery(api.admin.listCorePlaylists, {}) || []
+  
+  // Get categories for display
+  const categories = useQuery(api.admin.listCoreCategories, { includeInactive: true }) || []
+  
   // Check if id is valid
   if (!id || !/^[\w\d]+$/.test(id)) {
     // If ID format is invalid, return 404
     return notFound()
   }
 
-  // Fetch all playlists from Convex and filter client-side for the specific playlist
-  const playlists = useQuery(api.admin.listCorePlaylists, {}) || []
   const playlist = playlists.find((p: Doc<"corePlaylists">) => p._id === id) as Doc<"corePlaylists"> | undefined
   
   // Since we don't have a direct query for sections by playlist ID, we'll use a temporary solution
@@ -200,9 +198,8 @@ export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
   }
 
   // Get category name for display
-  const categories = useQuery(api.admin.listCoreCategories, { includeInactive: true }) || []
   const getCategoryName = (categoryId: string) => {
-    const category = categories.find((cat: any) => cat._id === categoryId)
+    const category = categories.find((cat: Doc<"coreCategories">) => cat._id === categoryId)
     return category ? category.name : "Unknown Category"
   }
 

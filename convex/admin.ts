@@ -1,9 +1,10 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation, MutationCtx, query, QueryCtx } from "./_generated/server";
+import { Doc, Id } from "./_generated/dataModel";
 
 // Helper function to check admin access
-async function requireAdminAccess(ctx: QueryCtx | MutationCtx) {
+async function requireAdminAccess(ctx: QueryCtx | MutationCtx): Promise<{ userId: Id<"users">; profile: Doc<"userProfiles"> }> {
   const userId = await getAuthUserId(ctx);
   if (!userId) {
     throw new Error("Authentication required");
@@ -27,7 +28,7 @@ async function requireAdminAccess(ctx: QueryCtx | MutationCtx) {
 
 export const listCoreCategories = query({
   args: { includeInactive: v.optional(v.boolean()) },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Doc<"coreCategories">[]> => {
     await requireAdminAccess(ctx);
 
     if (!args.includeInactive) {
@@ -50,7 +51,7 @@ export const createCoreCategory = mutation({
     color: v.optional(v.string()),
     iconUrl: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Id<"coreCategories">> => {
     const { userId } = await requireAdminAccess(ctx);
 
     // Check if slug already exists
@@ -85,12 +86,187 @@ export const createCoreCategory = mutation({
 // MEDIA MANAGEMENT
 // =================================================================
 
+// Media Tag Management
+export const addMediaTag = mutation({
+  args: {
+    mediaId: v.id("medias"),
+    tag: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; tagId: Id<"mediaTags"> }> => {
+    await requireAdminAccess(ctx);
+
+    // Validate media exists
+    const media = await ctx.db.get(args.mediaId);
+    if (!media) {
+      throw new Error("Media not found");
+    }
+
+    // Check if tag already exists for this media
+    const existingTag = await ctx.db
+      .query("mediaTags")
+      .withIndex("by_media_tag", (q) =>
+        q.eq("mediaId", args.mediaId).eq("tag", args.tag)
+      )
+      .unique();
+
+    if (existingTag) {
+      return { success: true, tagId: existingTag._id };
+    }
+
+    // Create new tag
+    const tagId = await ctx.db.insert("mediaTags", {
+      mediaId: args.mediaId,
+      tag: args.tag,
+      createdAt: Date.now(),
+    });
+
+    return { success: true, tagId };
+  },
+});
+
+export const removeMediaTag = mutation({
+  args: {
+    mediaId: v.id("medias"),
+    tag: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; message?: string }> => {
+    await requireAdminAccess(ctx);
+
+    // Find the tag
+    const tag = await ctx.db
+      .query("mediaTags")
+      .withIndex("by_media_tag", (q) =>
+        q.eq("mediaId", args.mediaId).eq("tag", args.tag)
+      )
+      .unique();
+
+    if (!tag) {
+      return { success: false, message: "Tag not found" };
+    }
+
+    // Delete the tag
+    await ctx.db.delete(tag._id);
+
+    return { success: true };
+  },
+});
+
+export const getMediaTags = query({
+  args: {
+    mediaId: v.id("medias"),
+  },
+  handler: async (ctx, args): Promise<Doc<"mediaTags">[]> => {
+    await requireAdminAccess(ctx);
+
+    // Validate media exists
+    const media = await ctx.db.get(args.mediaId);
+    if (!media) {
+      throw new Error("Media not found");
+    }
+
+    // Get all tags for this media
+    const tags = await ctx.db
+      .query("mediaTags")
+      .withIndex("by_media", (q) => q.eq("mediaId", args.mediaId))
+      .collect();
+
+    return tags.map(tag => tag.tag);
+  },
+});
+
+export const searchMediaByTags = query({
+  args: {
+    tags: v.array(v.string()),
+    mediaType: v.optional(v.union(v.literal("audio"), v.literal("video"))),
+    matchAll: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<Doc<"medias">[]> => {
+    await requireAdminAccess(ctx);
+
+    if (args.tags.length === 0) {
+      return [];
+    }
+
+    // Get all media IDs that match any of the provided tags
+    // Since we can't use q.in directly, we'll query for each tag separately and combine results
+    const tagQueries = await Promise.all(
+      args.tags.map(async (tag) => {
+        return await ctx.db
+          .query("mediaTags")
+          .filter((q) => q.eq(q.field("tag"), tag))
+          .collect();
+      })
+    );
+
+    // Flatten the results
+    const taggedMedias = tagQueries.flat();
+
+    // Group by mediaId and count tags
+    const mediaTagCounts = new Map();
+    const mediaIds = new Set();
+
+    for (const taggedMedia of taggedMedias) {
+      const { mediaId } = taggedMedia;
+      mediaIds.add(mediaId);
+
+      if (!mediaTagCounts.has(mediaId)) {
+        mediaTagCounts.set(mediaId, 1);
+      } else {
+        mediaTagCounts.set(mediaId, mediaTagCounts.get(mediaId) + 1);
+      }
+    }
+
+    // Filter by matchAll if required
+    const filteredMediaIds = [...mediaIds].filter(mediaId => {
+      if (args.matchAll) {
+        return mediaTagCounts.get(mediaId) === args.tags.length;
+      }
+      return true;
+    });
+
+    if (filteredMediaIds.length === 0) {
+      return [];
+    }
+
+    // Get the actual media documents
+    // Since we can't use q.in directly, we'll query for each ID separately and combine results
+    const mediaQueries = await Promise.all(
+      filteredMediaIds.map(async (mediaId) => {
+        // Type assertion needed for Convex's query filter
+        const typedMediaId = mediaId as any;
+        let query = ctx.db.query("medias").filter((q) => q.eq(q.field("_id"), typedMediaId));
+
+        // Add media type filter if provided
+        if (args.mediaType) {
+          query = query.filter((q) => q.eq(q.field("mediaType"), args.mediaType));
+        }
+
+        return await query.collect();
+      })
+    );
+
+    // Flatten the results
+    const medias = mediaQueries.flat();
+
+    // Get signed URLs for storage files
+    return await Promise.all(
+      medias.map(async (media) => ({
+        ...media,
+        url: media.storageId ? await ctx.storage.getUrl(media.storageId) : media.embedUrl,
+        thumbnailUrl: media.thumbnailStorageId
+          ? await ctx.storage.getUrl(media.thumbnailStorageId)
+          : media.thumbnailUrl,
+      }))
+    );
+  },
+});
+
 export const listMedias = query({
   args: {
     mediaType: v.optional(v.union(v.literal("audio"), v.literal("video"))),
     publicOnly: v.optional(v.boolean()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Doc<"medias">[]> => {
     await requireAdminAccess(ctx);
 
     let medias;
@@ -143,7 +319,7 @@ export const createMedia = mutation({
     duration: v.number(),
     isPublic: v.optional(v.boolean()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Id<"medias">> => {
     const { userId } = await requireAdminAccess(ctx);
 
     // Validate that either storageId or embedUrl is provided
@@ -174,7 +350,7 @@ export const updateMedia = mutation({
     transcript: v.optional(v.string()),
     waveformData: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<void> => {
     await requireAdminAccess(ctx);
 
     // Validate media exists
@@ -197,7 +373,7 @@ export const deleteMedia = mutation({
   args: {
     mediaId: v.id("medias"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean }> => {
     await requireAdminAccess(ctx);
 
     // Validate media exists
@@ -267,7 +443,7 @@ export const updateMediaMetadata = mutation({
     thumbnailStorageId: v.optional(v.id("_storage")),
     thumbnailUrl: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<void> => {
     await requireAdminAccess(ctx);
 
     // Validate media exists
@@ -311,7 +487,7 @@ export const listCorePlaylists = query({
     status: v.optional(v.union(v.literal("draft"), v.literal("published"))),
     categoryId: v.optional(v.id("coreCategories")),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Doc<"corePlaylists">[]> => {
     await requireAdminAccess(ctx);
 
     if (args.categoryId && args.status) {
@@ -345,13 +521,8 @@ export const createCorePlaylist = mutation({
     title: v.string(),
     description: v.optional(v.string()),
     categoryId: v.id("coreCategories"),
-    difficulty: v.optional(v.union(
-      v.literal("beginner"),
-      v.literal("intermediate"),
-      v.literal("advanced")
-    )),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Id<"corePlaylists">> => {
     const { userId } = await requireAdminAccess(ctx);
 
     return await ctx.db.insert("corePlaylists", {
@@ -366,7 +537,7 @@ export const createCorePlaylist = mutation({
 
 export const publishCorePlaylist = mutation({
   args: { playlistId: v.id("corePlaylists") },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<void> => {
     await requireAdminAccess(ctx);
 
     const playlist = await ctx.db.get(args.playlistId);
@@ -412,7 +583,7 @@ export const createCoreSection = mutation({
     maxSelectMedia: v.number(),
     isRequired: v.optional(v.boolean()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Id<"coreSections">> => {
     await requireAdminAccess(ctx);
 
     // Validate playlist exists and is in draft status
@@ -448,7 +619,7 @@ export const addMediaToSection = mutation({
     isOptional: v.optional(v.boolean()),
     defaultSelected: v.optional(v.boolean()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean; sectionMediaId: Id<"sectionMedias"> }> => {
     await requireAdminAccess(ctx);
 
     // Validate section exists and playlist is in draft
@@ -496,7 +667,7 @@ export const listCoreSections = query({
   args: {
     playlistId: v.optional(v.id("corePlaylists")),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Doc<"coreSections">[]> => {
     await requireAdminAccess(ctx);
 
     if (args.playlistId) {
@@ -523,7 +694,7 @@ export const updateCoreSection = mutation({
     maxSelectMedia: v.optional(v.number()),
     isRequired: v.optional(v.boolean()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<void> => {
     await requireAdminAccess(ctx);
 
     // Validate section exists
@@ -558,7 +729,7 @@ export const removeCoreSection = mutation({
   args: {
     sectionId: v.id("coreSections"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean }> => {
     await requireAdminAccess(ctx);
 
     // Validate section exists
@@ -612,7 +783,7 @@ export const reorderCoreSections = mutation({
       })
     ),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean }> => {
     await requireAdminAccess(ctx);
 
     if (args.sectionOrders.length === 0) {
@@ -651,14 +822,9 @@ export const updateCorePlaylist = mutation({
     title: v.optional(v.string()),
     description: v.optional(v.string()),
     categoryId: v.optional(v.id("coreCategories")),
-    difficulty: v.optional(v.union(
-      v.literal("beginner"),
-      v.literal("intermediate"),
-      v.literal("advanced")
-    )),
     thumbnailStorageId: v.optional(v.id("_storage")),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<void> => {
     await requireAdminAccess(ctx);
 
     // Validate playlist exists
@@ -691,7 +857,7 @@ export const deleteCorePlaylist = mutation({
   args: {
     playlistId: v.id("corePlaylists"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean }> => {
     await requireAdminAccess(ctx);
 
     // Validate playlist exists
@@ -730,5 +896,319 @@ export const deleteCorePlaylist = mutation({
     await ctx.db.delete(args.playlistId);
 
     return { success: true };
+  },
+});
+
+
+// =================================================================
+// CLAUDE ENHANCEMENTS - Core Playlists Features
+// =================================================================
+
+// Duplicate a core playlist with optional section copying
+export const duplicateCorePlaylist = mutation({
+  args: {
+    sourcePlaylistId: v.id("corePlaylists"),
+    newTitle: v.string(),
+    keepSections: v.optional(v.boolean()),
+    copyToCategory: v.optional(v.id("coreCategories"))
+  },
+  handler: async (ctx, args): Promise<Id<"corePlaylists">> => {
+    const { userId } = await requireAdminAccess(ctx);
+
+    // Get source playlist
+    const sourcePlaylist = await ctx.db.get(args.sourcePlaylistId);
+    if (!sourcePlaylist) {
+      throw new Error("Source playlist not found");
+    }
+
+    // Create new playlist with copied data
+    const newPlaylistId = await ctx.db.insert("corePlaylists", {
+      title: args.newTitle,
+      description: sourcePlaylist.description,
+      categoryId: args.copyToCategory || sourcePlaylist.categoryId,
+      difficulty: sourcePlaylist.difficulty,
+      estimatedDuration: sourcePlaylist.estimatedDuration,
+      status: "draft", // Always start as draft
+      playCount: 0,
+      averageRating: undefined,
+      publishedAt: undefined,
+      lastModifiedAt: Date.now(),
+      createdBy: userId,
+      thumbnailStorageId: sourcePlaylist.thumbnailStorageId, // Share thumbnail initially
+    });
+
+    // Copy sections if requested
+    if (args.keepSections) {
+      const sections = await ctx.db
+        .query("coreSections")
+        .withIndex("by_playlist_order", (q) => q.eq("playlistId", args.sourcePlaylistId))
+        .collect();
+
+      for (const section of sections) {
+        const newSectionId = await ctx.db.insert("coreSections", {
+          playlistId: newPlaylistId,
+          title: section.title,
+          description: section.description,
+          sectionType: section.sectionType,
+          minSelectMedia: section.minSelectMedia,
+          maxSelectMedia: section.maxSelectMedia,
+          order: section.order,
+          isRequired: section.isRequired,
+          estimatedDuration: section.estimatedDuration,
+        });
+
+        // Copy section medias
+        const sectionMedias = await ctx.db
+          .query("sectionMedias")
+          .withIndex("by_section_order", (q) => q.eq("sectionId", section._id))
+          .collect();
+
+        for (const media of sectionMedias) {
+          await ctx.db.insert("sectionMedias", {
+            sectionId: newSectionId,
+            mediaId: media.mediaId,
+            order: media.order,
+            isOptional: media.isOptional,
+            defaultSelected: media.defaultSelected,
+          });
+        }
+      }
+    }
+
+    return newPlaylistId;
+  },
+});
+
+// Update playlist thumbnail
+export const updatePlaylistThumbnail = mutation({
+  args: {
+    playlistId: v.id("corePlaylists"),
+    thumbnailStorageId: v.optional(v.id("_storage"))
+  },
+  handler: async (ctx, args): Promise<void> => {
+    await requireAdminAccess(ctx);
+
+    const playlist = await ctx.db.get(args.playlistId);
+    if (!playlist) {
+      throw new Error("Playlist not found");
+    }
+
+    // Delete old thumbnail if exists and different from new one
+    if (playlist.thumbnailStorageId &&
+      playlist.thumbnailStorageId !== args.thumbnailStorageId) {
+      await ctx.storage.delete(playlist.thumbnailStorageId);
+    }
+
+    // Update with new thumbnail
+    await ctx.db.patch(args.playlistId, {
+      thumbnailStorageId: args.thumbnailStorageId,
+      lastModifiedAt: Date.now()
+    });
+
+    return { success: true };
+  },
+});
+
+// Batch add medias to section
+export const batchAddMediasToSection = mutation({
+  args: {
+    sectionId: v.id("coreSections"),
+    mediaIds: v.array(v.id("medias")),
+    startOrder: v.optional(v.number())
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; addedCount: number; skippedCount: number; }> => {
+    await requireAdminAccess(ctx);
+
+    // Validate section exists and playlist is in draft
+    const section = await ctx.db.get(args.sectionId);
+    if (!section) {
+      throw new Error("Section not found");
+    }
+
+    const playlist = await ctx.db.get(section.playlistId);
+    if (!playlist || playlist.status === "published") {
+      throw new Error("Cannot modify published playlist");
+    }
+
+    // Get starting order
+    let order = args.startOrder || 1;
+    if (!args.startOrder) {
+      const lastMedia = await ctx.db
+        .query("sectionMedias")
+        .withIndex("by_section_order", (q) => q.eq("sectionId", args.sectionId))
+        .order("desc")
+        .first();
+      order = lastMedia ? lastMedia.order + 1 : 1;
+    }
+
+    // Add each media to the section
+    const addedMediaIds = [];
+    for (const mediaId of args.mediaIds) {
+      // Check if media already exists in section
+      const existing = await ctx.db
+        .query("sectionMedias")
+        .withIndex("by_section", (q) => q.eq("sectionId", args.sectionId))
+        .filter((q) => q.eq(q.field("mediaId"), mediaId))
+        .unique();
+
+      if (!existing) {
+        await ctx.db.insert("sectionMedias", {
+          sectionId: args.sectionId,
+          mediaId,
+          order: order++,
+          isOptional: false,
+          defaultSelected: true,
+        });
+        addedMediaIds.push(mediaId);
+      }
+    }
+
+    return {
+      success: true,
+      addedCount: addedMediaIds.length,
+      skippedCount: args.mediaIds.length - addedMediaIds.length
+    };
+  },
+});
+
+// Batch remove medias from section
+export const batchRemoveMediasFromSection = mutation({
+  args: {
+    sectionId: v.id("coreSections"),
+    mediaIds: v.array(v.id("medias"))
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; removedCount: number; }> => {
+    await requireAdminAccess(ctx);
+
+    // Validate section exists and playlist is in draft
+    const section = await ctx.db.get(args.sectionId);
+    if (!section) {
+      throw new Error("Section not found");
+    }
+
+    const playlist = await ctx.db.get(section.playlistId);
+    if (!playlist || playlist.status === "published") {
+      throw new Error("Cannot modify published playlist");
+    }
+
+    let removedCount = 0;
+    for (const mediaId of args.mediaIds) {
+      const sectionMedia = await ctx.db
+        .query("sectionMedias")
+        .withIndex("by_section", (q) => q.eq("sectionId", args.sectionId))
+        .filter((q) => q.eq(q.field("mediaId"), mediaId))
+        .unique();
+
+      if (sectionMedia) {
+        await ctx.db.delete(sectionMedia._id);
+        removedCount++;
+      }
+    }
+
+    return {
+      success: true,
+      removedCount
+    };
+  },
+});
+
+// Get playlist with full details for preview
+export const getPlaylistPreview = query({
+  args: {
+    playlistId: v.id("corePlaylists")
+  },
+  handler: async (ctx, args): Promise<any> => {
+    await requireAdminAccess(ctx);
+
+    const playlist = await ctx.db.get(args.playlistId);
+    if (!playlist) {
+      throw new Error("Playlist not found");
+    }
+
+    // Get all sections with their media
+    const sections = await ctx.db
+      .query("coreSections")
+      .withIndex("by_playlist_order", (q) => q.eq("playlistId", args.playlistId))
+      .collect();
+
+    const sectionsWithMedia = await Promise.all(
+      sections.map(async (section) => {
+        const sectionMedias = await ctx.db
+          .query("sectionMedias")
+          .withIndex("by_section_order", (q) => q.eq("sectionId", section._id))
+          .collect();
+
+        const mediasWithDetails = await Promise.all(
+          sectionMedias.map(async (sm) => {
+            const media = await ctx.db.get(sm.mediaId);
+            return {
+              ...sm,
+              media
+            };
+          })
+        );
+
+        return {
+          ...section,
+          medias: mediasWithDetails
+        };
+      })
+    );
+
+    // Get category info
+    const category = await ctx.db.get(playlist.categoryId);
+
+    return {
+      ...playlist,
+      category,
+      sections: sectionsWithMedia
+    };
+  },
+});
+
+// Get playlist stats for analytics
+export const getPlaylistStats = query({
+  args: {
+    playlistId: v.id("corePlaylists")
+  },
+  handler: async (ctx, args): Promise<any> => {
+    await requireAdminAccess(ctx);
+
+    const playlist = await ctx.db.get(args.playlistId);
+    if (!playlist) {
+      throw new Error("Playlist not found");
+    }
+
+    // Count sections
+    const sectionsCount = await ctx.db
+      .query("coreSections")
+      .withIndex("by_playlist", (q) => q.eq("playlistId", args.playlistId))
+      .collect();
+
+    // Count total medias across all sections
+    let totalMedias = 0;
+    for (const section of sectionsCount) {
+      const medias = await ctx.db
+        .query("sectionMedias")
+        .withIndex("by_section", (q) => q.eq("sectionId", section._id))
+        .collect();
+      totalMedias += medias.length;
+    }
+
+    // Count user playlists based on this core playlist
+    const userPlaylistsCount = await ctx.db
+      .query("userPlaylists")
+      .withIndex("by_core_playlist", (q) => q.eq("corePlaylistId", args.playlistId))
+      .collect();
+
+    return {
+      sectionsCount: sectionsCount.length,
+      totalMedias,
+      userPlaylistsCount: userPlaylistsCount.length,
+      playCount: playlist.playCount,
+      averageRating: playlist.averageRating,
+      status: playlist.status,
+      createdAt: playlist.lastModifiedAt // Using lastModifiedAt as creation timestamp
+    };
   },
 });

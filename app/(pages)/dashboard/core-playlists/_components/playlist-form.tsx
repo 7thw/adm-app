@@ -1,18 +1,18 @@
 "use client"
 
-import { useUser } from "@clerk/nextjs"
 import { useMutation, useQuery } from "convex/react"
-import { SaveIcon } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { SaveIcon, Upload, X } from "lucide-react"
+import Image from "next/image"
+import { useState, useRef, useEffect } from "react"
 import { toast } from "sonner"
 
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
 
@@ -23,6 +23,7 @@ interface PlaylistFormProps {
     description?: string
     categoryId?: Id<"coreCategories">
     status?: "draft" | "published"
+    thumbnailStorageId?: Id<"_storage">
   }
   onSuccess?: (playlistId: Id<"corePlaylists">) => void
   submitLabel?: string
@@ -32,71 +33,127 @@ interface PlaylistFormProps {
 export function PlaylistForm({
   initialData,
   onSuccess,
-  submitLabel = "Create corePlaylist",
+  submitLabel = "Create Playlist",
   isEdit = false
 }: PlaylistFormProps) {
-  const router = useRouter()
-  const { user } = useUser()
-
   const [title, setTitle] = useState(initialData?.title || "")
   const [description, setDescription] = useState(initialData?.description || "")
-  const [categoryId, setCategoryId] = useState<Id<"coreCategories"> | "">(initialData?.categoryId || "")
-  const [status, setStatus] = useState<"draft" | "published">(initialData?.status || "draft")
+  const [categoryId, setCategoryId] = useState<Id<"coreCategories"> | "">(
+    initialData?.categoryId || ""
+  )
+  const [status, setStatus] = useState<"draft" | "published">(
+    initialData?.status || "draft"
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Get categories for dropdown
-  const categories = useQuery(api.admin.listCoreCategories, { includeInactive: false }) || []
+  // Thumbnail upload state
+  const [thumbnailFile, setThumbnailFile] = useState<File | undefined>(undefined)
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | undefined>(
+    // Using a placeholder until thumbnail logic is complete
+    "https://via.placeholder.com/400x200"
+  )
+  const [thumbnailStorageId, setThumbnailStorageId] = useState<
+    Id<"_storage"> | undefined
+  >(initialData?.thumbnailStorageId || undefined)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Convex mutations
+  // Get categories for dropdown
+  const categories = useQuery(api.admin.listCoreCategories, {})
+
+  // Mutations
   const createPlaylist = useMutation(api.admin.createCorePlaylist)
   const updatePlaylist = useMutation(api.admin.updateCorePlaylist)
+  // const generateUploadUrl = useMutation(api.r2Upload.generateUploadUrl) // Temporarily disabled
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Temporarily disable thumbnail fetching logic
+  /*
+  const { data: thumbnailUrl } = useQuery(
+    api.r2Upload.getMediaUrl,
+    thumbnailStorageId ? { storageId: thumbnailStorageId } : "skip"
+  )
 
-    if (!title.trim()) {
-      toast.error("Title is required")
-      return
+  useEffect(() => {
+    if (thumbnailUrl) {
+      setThumbnailPreview(thumbnailUrl)
     }
+  }, [thumbnailUrl])
+  */
 
+  const handleThumbnailSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setThumbnailFile(file)
+      setThumbnailPreview(URL.createObjectURL(file))
+    }
+  }
+
+  const removeThumbnail = () => {
+    setThumbnailFile(undefined)
+    setThumbnailPreview(undefined)
+    setThumbnailStorageId(undefined)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
     if (!categoryId) {
-      toast.error("Category is required")
+      toast.error("Please select a category.")
       return
     }
+    setIsSubmitting(true)
 
     try {
-      setIsSubmitting(true)
+      let finalThumbnailStorageId = thumbnailStorageId
 
-      let playlistId: Id<"corePlaylists">
+      // 1. Handle thumbnail upload if a new file is selected
+      if (thumbnailFile) {
+        const postUrl = await generateUploadUrl()
+        const result = await fetch(postUrl, {
+          method: "POST",
+          headers: { "Content-Type": thumbnailFile.type },
+          body: thumbnailFile
+        })
+        const { storageId: newStorageId } = await result.json()
+        finalThumbnailStorageId = newStorageId
+        toast.success("Thumbnail uploaded successfully!")
+      }
 
+      // 2. Create or update the playlist
       if (isEdit && initialData?._id) {
         // Update existing playlist
         await updatePlaylist({
-          playlistId: initialData._id,
+          id: initialData._id,
           title,
-          description: description || "",
-          categoryId: categoryId as unknown as Id<"coreCategories">
+          description,
+          categoryId: categoryId as Id<"coreCategories">,
+          status,
+          thumbnailStorageId: finalThumbnailStorageId
         })
-        playlistId = initialData._id
-        toast.success("corePlaylist updated successfully")
+        toast.success("Playlist updated successfully!")
+        if (onSuccess) {
+          onSuccess(initialData._id)
+        }
       } else {
         // Create new playlist
-        playlistId = await createPlaylist({
+        const newPlaylistId = await createPlaylist({
           title,
-          description: description || "",
-          categoryId: categoryId as unknown as Id<"coreCategories">,
+          description,
+          categoryId: categoryId as Id<"coreCategories">,
           status,
+          thumbnailStorageId: finalThumbnailStorageId
         })
-        toast.success("corePlaylist created successfully")
+        toast.success("Playlist created successfully!")
+        if (onSuccess) {
+          onSuccess(newPlaylistId)
+        }
       }
-
-      if (onSuccess) {
-        onSuccess(playlistId)
-      }
-
     } catch (error) {
-      console.error("Error saving playlist:", error)
-      toast.error(isEdit ? "Failed to update playlist" : "Failed to create playlist")
+      console.error(error)
+      toast.error(
+        isEdit ? "Failed to update playlist." : "Failed to create playlist."
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -104,23 +161,24 @@ export function PlaylistForm({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{isEdit ? "Edit corePlaylist" : "corePlaylist Details"}</CardTitle>
-        <CardDescription>
-          {isEdit
-            ? "Update the information for this playlist"
-            : "Enter the basic information for your new playlist"}
-        </CardDescription>
-      </CardHeader>
       <form onSubmit={handleSubmit}>
+        <CardHeader>
+          <CardTitle>{isEdit ? "Edit Playlist" : "Create New Playlist"}</CardTitle>
+          <CardDescription>
+            {isEdit
+              ? "Update the details of the existing playlist."
+              : "Fill in the details to create a new core playlist."}
+          </CardDescription>
+        </CardHeader>
+
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
             <Input
               id="title"
-              placeholder="Enter playlist title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g., Morning Meditation"
               required
             />
           </div>
@@ -129,28 +187,26 @@ export function PlaylistForm({
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              placeholder="Enter playlist description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={3}
+              placeholder="A brief description of the playlist."
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
             <Select
-              value={categoryId ? categoryId.toString() : ""}
-              onValueChange={(value) => setCategoryId(value as unknown as Id<"coreCategories">)}
+              value={categoryId}
+              onValueChange={(value) =>
+                setCategoryId(value as Id<"coreCategories">)
+              }
             >
               <SelectTrigger id="category">
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem
-                    key={category._id.toString()}
-                    value={category._id.toString()}
-                  >
+                {categories?.map((category) => (
+                  <SelectItem key={category._id} value={category._id}>
                     {category.name}
                   </SelectItem>
                 ))}
@@ -158,12 +214,75 @@ export function PlaylistForm({
             </Select>
           </div>
 
+          <div className="space-y-2">
+            <Label>Thumbnail Image</Label>
+            <div className="flex items-center gap-4">
+              {thumbnailPreview && (
+                <div className="relative w-32 h-32 rounded-lg border overflow-hidden">
+                  <Image
+                    src={thumbnailPreview}
+                    alt="Thumbnail preview"
+                    width={128}
+                    height={128}
+                    className="w-full h-full object-cover"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="absolute top-1 right-1 h-6 w-6"
+                    onClick={removeThumbnail}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Label
+                    htmlFor="thumbnail-file-input"
+                    className={cn(
+                      buttonVariants({ variant: "outline" }),
+                      "cursor-pointer",
+                      "gap-2"
+                    )}
+                  >
+                    <Upload className="h-4 w-4" />
+                    {thumbnailPreview ? "Change Thumbnail" : "Upload Thumbnail"}
+                  </Label>
+                  {thumbnailPreview && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={removeThumbnail}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                  <input
+                    id="thumbnail-file-input"
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleThumbnailSelect}
+                    className="hidden"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Upload an image (max 5MB) for the playlist thumbnail
+                </p>
+              </div>
+            </div>
+          </div>
+
           {isEdit && (
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select
                 value={status}
-                onValueChange={(value) => setStatus(value as "draft" | "published")}
+                onValueChange={(value) =>
+                  setStatus(value as "draft" | "published")
+                }
               >
                 <SelectTrigger id="status">
                   <SelectValue placeholder="Select status" />

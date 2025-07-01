@@ -98,7 +98,6 @@ type CorePlaylist = {
   description?: string
   status: "draft" | "published"
   categoryId: Id<"coreCategories">
-  difficulty?: "beginner" | "intermediate" | "advanced"
   estimatedDuration?: number
   playCount: number
   averageRating?: number
@@ -553,259 +552,115 @@ export default function CorePlaylistEditPage() {
               className="mt-4"
             />
             <DialogFooter className="mt-4">
-              disabled={isSaving}
-              className="gap-2"
-      >
-              <SaveIcon className="h-4 w-4" />
-              {isSaving ? "Saving..." : "Save Core corePlaylist"}
-            </Button>
+              <Button
+                disabled={isSaving}
+                className="gap-2"
+              >
+                <SaveIcon className="h-4 w-4" />
+                {isSaving ? "Saving..." : "Save Core corePlaylist"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-          </div>
-
-          {/* Core corePlaylist metadata */}
-          <Card>
-            <CardHeader>
-              <CardTitle>corePlaylist Details</CardTitle>
-              <CardDescription>Basic information about the playlist</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Enter playlist title"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Enter playlist description"
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-1">
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select
-                    value={categoryId ? categoryId.toString() : ""}
-                    onValueChange={(value) => setCategoryId(value as Id<"coreCategories">)}
-                  >
-                    <SelectTrigger id="category">
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category: any) => (
-                        <SelectItem key={category._id.toString()} value={category._id as Id<"coreCategories">}>
-                          {category.title || category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={status}
-                    onValueChange={(value) => setStatus(value as "draft" | "published")}
-                  >
-                    <SelectTrigger id="status">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="published">Published</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Sections */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">corePlaylist Sections</h2>
-              <Sheet open={isAddingSectionOpen} onOpenChange={setIsAddingSectionOpen}>
-                <SheetTrigger asChild>
-                  <Button
-                    className="gap-2"
-                    disabled={!isCorePlaylistSaved}
-                    title={!isCorePlaylistSaved ? "Save the playlist first before adding sections" : "Add a new section"}
-                  >
-                    <PlusIcon className="h-4 w-4" />
-                    Add Section
-                  </Button>
-                </SheetTrigger>
-                <SheetContent>
-                  <SheetHeader>
-                    <SheetTitle>Add New Section</SheetTitle>
-                    <SheetDescription>
-                      Create a new section for this playlist. Sections can contain multiple media items.
-                    </SheetDescription>
-                  </SheetHeader>
-                  <div className="py-4 space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="section-title">Title</Label>
-                      <Input id="section-title" placeholder="Enter section title" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="section-type">Type</Label>
-                      <Select defaultValue="base">
-                        <SelectTrigger id="section-type">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="base">Base (plays once)</SelectItem>
-                          <SelectItem value="loop">Loop (repeats)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="section-max-select">Max Selectable Media</Label>
-                      <Input
-                        id="section-max-select"
-                        type="number"
-                        min="1"
-                        step="1"
-                        placeholder="Enter maximum number of media items"
-                        onKeyDown={(e) => {
-                          // Allow only numbers, backspace, delete, tab, arrows
-                          if (!/[0-9]/.test(e.key) &&
-                            !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                            e.preventDefault()
-                          }
-                        }}
-                      />
-                    </div>
-                    <Button
-                      className="w-full mt-4"
-                      disabled={!isCorePlaylistSaved}
-                      onClick={() => {
-                        if (!isCorePlaylistSaved) {
-                          toast.error("Please save the playlist first before adding sections")
-                          return
-                        }
-
-                        const titleEl = document.getElementById("section-title") as HTMLInputElement
-                        const typeEl = document.querySelector("#section-type [data-value]") as HTMLElement
-                        const maxSelectEl = document.getElementById("section-max-select") as HTMLInputElement
-
-                        if (!titleEl.value.trim()) {
-                          toast.error("Section title is required")
-                          return
-                        }
-
-                        handleAddSection({
-                          title: titleEl.value,
-                          type: (typeEl?.getAttribute("data-value") || "base") as "base" | "loop",
-                          maxSelectMedia: maxSelectEl.value ? parseInt(maxSelectEl.value) : undefined
-                        })
-                      }}>
-                      Add Section
-                    </Button>
-                  </div>
-                </SheetContent>
-              </Sheet>
+        {/* Core corePlaylist metadata */}
+        <Card>
+          <CardHeader>
+            <CardTitle>corePlaylist Details</CardTitle>
+            <CardDescription>Basic information about the playlist</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter playlist title"
+              />
             </div>
 
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleSectionDragEnd}
-            >
-              <SortableContext
-                items={sections.map(s => s._id.toString())}
-                strategy={verticalListSortingStrategy}
-              >
-                {sections.map((section) => (
-                  <SortableSection
-                    key={section._id.toString()}
-                    section={section}
-                    onEdit={setEditingSection}
-                    onDelete={handleDeleteSection}
-                  >
-                    <div className="space-y-2">
-                      {/* Media table will go here */}
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-sm font-medium">Media Items</h3>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1"
-                          onClick={() => {
-                            setCurrentSectionId(section._id)
-                            setIsAddingMedia(true)
-                          }}
-                        >
-                          <PlusIcon className="h-3 w-3" />
-                          Add Media
-                        </Button>
-                      </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Enter playlist description"
+                rows={3}
+              />
+            </div>
 
-                      <SectionMediaTable
-                        sectionId={section._id}
-                        maxSelectMedia={section.maxSelectMedia}
-                        onPlayMedia={handlePlayMedia}
-                      />
-                    </div>
-                  </SortableSection>
-                ))}
-              </SortableContext>
-            </DndContext>
-
-            {sections.length === 0 && (
-              <div className="text-center p-8 border rounded-md bg-muted/10">
-                <p className="text-muted-foreground">No sections found. Add a section to get started.</p>
+            <div className="grid grid-cols-2 gap-1">
+              <div className="space-y-2">
+                <Label htmlFor="category">Category</Label>
+                <Select
+                  value={categoryId ? categoryId.toString() : ""}
+                  onValueChange={(value) => setCategoryId(value as Id<"coreCategories">)}
+                >
+                  <SelectTrigger id="category">
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category: any) => (
+                      <SelectItem key={category._id.toString()} value={category._id as Id<"coreCategories">}>
+                        {category.title || category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-          </div>
 
-          {/* Edit Section Sheet */}
-          {editingSection && (
-            <Sheet open={!!editingSection} onOpenChange={(open) => !open && setEditingSection(null)}>
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={status}
+                  onValueChange={(value) => setStatus(value as "draft" | "published")}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Sections */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">corePlaylist Sections</h2>
+            <Sheet open={isAddingSectionOpen} onOpenChange={setIsAddingSectionOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  className="gap-2"
+                  disabled={!isCorePlaylistSaved}
+                  title={!isCorePlaylistSaved ? "Save the playlist first before adding sections" : "Add a new section"}
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Add Section
+                </Button>
+              </SheetTrigger>
               <SheetContent>
                 <SheetHeader>
-                  <SheetTitle>Edit Section</SheetTitle>
+                  <SheetTitle>Add New Section</SheetTitle>
                   <SheetDescription>
-                    Make changes to the section details.
+                    Create a new section for this playlist. Sections can contain multiple media items.
                   </SheetDescription>
                 </SheetHeader>
                 <div className="py-4 space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="edit-section-title">Title</Label>
-                    <Input
-                      id="edit-section-title"
-                      value={editingSection.title}
-                      onChange={(e) => setEditingSection({ ...editingSection, title: e.target.value })}
-                    />
+                    <Label htmlFor="section-title">Title</Label>
+                    <Input id="section-title" placeholder="Enter section title" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-section-description">Description</Label>
-                    <Textarea
-                      id="edit-section-description"
-                      value={editingSection.description}
-                      onChange={(e) => setEditingSection({ ...editingSection, description: e.target.value })}
-                      rows={3}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-section-type">Type</Label>
-                    <Select
-                      value={editingSection.sectionType}
-                      onValueChange={(value) => setEditingSection({
-                        ...editingSection,
-                        sectionType: value as "base" | "loop"
-                      })}
-                    >
-                      <SelectTrigger id="edit-section-type">
+                    <Label htmlFor="section-type">Type</Label>
+                    <Select defaultValue="base">
+                      <SelectTrigger id="section-type">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -815,103 +670,249 @@ export default function CorePlaylistEditPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-section-max-select">Max Selectable Media</Label>
+                    <Label htmlFor="section-max-select">Max Selectable Media</Label>
                     <Input
-                      id="edit-section-max-select"
+                      id="section-max-select"
                       type="number"
-                      value={editingSection.maxSelectMedia || 0}
-                      onChange={(e) => setEditingSection({
-                        ...editingSection,
-                        maxSelectMedia: parseInt(e.target.value) || 0
-                      })}
+                      min="1"
+                      step="1"
+                      placeholder="Enter maximum number of media items"
+                      onKeyDown={(e) => {
+                        // Allow only numbers, backspace, delete, tab, arrows
+                        if (!/[0-9]/.test(e.key) &&
+                          !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                          e.preventDefault()
+                        }
+                      }}
                     />
                   </div>
-                  <Button className="w-full mt-4" onClick={() => handleEditSection(editingSection)}>
-                    Save Changes
+                  <Button
+                    className="w-full mt-4"
+                    disabled={!isCorePlaylistSaved}
+                    onClick={() => {
+                      if (!isCorePlaylistSaved) {
+                        toast.error("Please save the playlist first before adding sections")
+                        return
+                      }
+
+                      const titleEl = document.getElementById("section-title") as HTMLInputElement
+                      const typeEl = document.querySelector("#section-type [data-value]") as HTMLElement
+                      const maxSelectEl = document.getElementById("section-max-select") as HTMLInputElement
+
+                      if (!titleEl.value.trim()) {
+                        toast.error("Section title is required")
+                        return
+                      }
+
+                      handleAddSection({
+                        title: titleEl.value,
+                        type: (typeEl?.getAttribute("data-value") || "base") as "base" | "loop",
+                        maxSelectMedia: maxSelectEl.value ? parseInt(maxSelectEl.value) : undefined
+                      })
+                    }}>
+                    Add Section
                   </Button>
                 </div>
               </SheetContent>
             </Sheet>
-          )}
+          </div>
 
-          {/* Add Media Sheet */}
-          <Sheet open={isAddingMedia} onOpenChange={(open) => {
-            if (!open) {
-              setSelectedMediaIds(new Set())
-            }
-            setIsAddingMedia(open)
-          }}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleSectionDragEnd}
+          >
+            <SortableContext
+              items={sections.map(s => s._id.toString())}
+              strategy={verticalListSortingStrategy}
+            >
+              {sections.map((section) => (
+                <SortableSection
+                  key={section._id.toString()}
+                  section={section}
+                  onEdit={setEditingSection}
+                  onDelete={handleDeleteSection}
+                >
+                  <div className="space-y-2">
+                    {/* Media table will go here */}
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-medium">Media Items</h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        onClick={() => {
+                          setCurrentSectionId(section._id)
+                          setIsAddingMedia(true)
+                        }}
+                      >
+                        <PlusIcon className="h-3 w-3" />
+                        Add Media
+                      </Button>
+                    </div>
+
+                    <SectionMediaTable
+                      sectionId={section._id}
+                      maxSelectMedia={section.maxSelectMedia}
+                      onPlayMedia={handlePlayMedia}
+                    />
+                  </div>
+                </SortableSection>
+              ))}
+            </SortableContext>
+          </DndContext>
+
+          {sections.length === 0 && (
+            <div className="text-center p-8 border rounded-md bg-muted/10">
+              <p className="text-muted-foreground">No sections found. Add a section to get started.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Edit Section Sheet */}
+        {editingSection && (
+          <Sheet open={!!editingSection} onOpenChange={(open) => !open && setEditingSection(null)}>
             <SheetContent>
               <SheetHeader>
-                <SheetTitle>Add Media</SheetTitle>
+                <SheetTitle>Edit Section</SheetTitle>
                 <SheetDescription>
-                  Select media items to add to this section.
+                  Make changes to the section details.
                 </SheetDescription>
               </SheetHeader>
               <div className="py-4 space-y-4">
                 <div className="space-y-2">
-                  <Label>Available Media</Label>
-                  <div className="border rounded-md divide-y max-h-96 overflow-y-auto">
-                    {allMedia.map((media) => {
-                      const mediaId = media._id.toString()
-                      const isSelected = selectedMediaIds.has(mediaId)
-                      return (
-                        <div key={mediaId} className="p-3 flex items-center gap-3">
-                          <Checkbox
-                            id={`media-${mediaId}`}
-                            checked={isSelected}
-                            onCheckedChange={(checked) => {
-                              const newSelected = new Set(selectedMediaIds)
-                              if (checked) {
-                                newSelected.add(mediaId)
-                              } else {
-                                newSelected.delete(mediaId)
-                              }
-                              setSelectedMediaIds(newSelected)
-                            }}
-                          />
-                          <Label htmlFor={`media-${mediaId}`} className="flex-1 cursor-pointer">
-                            <div className="font-medium">{media.title}</div>
-                            <div className="text-sm text-muted-foreground">{media.description}</div>
-                          </Label>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <Label htmlFor="edit-section-title">Title</Label>
+                  <Input
+                    id="edit-section-title"
+                    value={editingSection.title}
+                    onChange={(e) => setEditingSection({ ...editingSection, title: e.target.value })}
+                  />
                 </div>
-                <Button
-                  className="w-full"
-                  disabled={selectedMediaIds.size === 0 || !currentSectionId}
-                  onClick={async () => {
-                    if (!currentSectionId) return
-
-                    try {
-                      // Add each selected media to the section
-                      const promises = Array.from(selectedMediaIds).map(mediaId => {
-                        return addMediaToSectionMutation({
-                          sectionId: currentSectionId,
-                          mediaId: mediaId as Id<"medias">,
-                          isOptional: false, // Not optional by default
-                          defaultSelected: true // Selected by default when adding
-                        })
-                      })
-
-                      await Promise.all(promises)
-
-                      toast.success(`Added ${selectedMediaIds.size} media items to section`)
-                      setIsAddingMedia(false)
-                      setSelectedMediaIds(new Set())
-                    } catch (error) {
-                      console.error("Error adding media:", error)
-                      toast.error("Failed to add media to section")
-                    }
-                  }}
-                >
-                  Add Selected Media
+                <div className="space-y-2">
+                  <Label htmlFor="edit-section-description">Description</Label>
+                  <Textarea
+                    id="edit-section-description"
+                    value={editingSection.description}
+                    onChange={(e) => setEditingSection({ ...editingSection, description: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-section-type">Type</Label>
+                  <Select
+                    value={editingSection.sectionType}
+                    onValueChange={(value) => setEditingSection({
+                      ...editingSection,
+                      sectionType: value as "base" | "loop"
+                    })}
+                  >
+                    <SelectTrigger id="edit-section-type">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="base">Base (plays once)</SelectItem>
+                      <SelectItem value="loop">Loop (repeats)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-section-max-select">Max Selectable Media</Label>
+                  <Input
+                    id="edit-section-max-select"
+                    type="number"
+                    value={editingSection.maxSelectMedia || 0}
+                    onChange={(e) => setEditingSection({
+                      ...editingSection,
+                      maxSelectMedia: parseInt(e.target.value) || 0
+                    })}
+                  />
+                </div>
+                <Button className="w-full mt-4" onClick={() => handleEditSection(editingSection)}>
+                  Save Changes
                 </Button>
               </div>
             </SheetContent>
           </Sheet>
+        )}
+
+        {/* Add Media Sheet */}
+        <Sheet open={isAddingMedia} onOpenChange={(open) => {
+          if (!open) {
+            setSelectedMediaIds(new Set())
+          }
+          setIsAddingMedia(open)
+        }}>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Add Media</SheetTitle>
+              <SheetDescription>
+                Select media items to add to this section.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Available Media</Label>
+                <div className="border rounded-md divide-y max-h-96 overflow-y-auto">
+                  {allMedia.map((media) => {
+                    const mediaId = media._id.toString()
+                    const isSelected = selectedMediaIds.has(mediaId)
+                    return (
+                      <div key={mediaId} className="p-3 flex items-center gap-3">
+                        <Checkbox
+                          id={`media-${mediaId}`}
+                          checked={isSelected}
+                          onCheckedChange={(checked) => {
+                            const newSelected = new Set(selectedMediaIds)
+                            if (checked) {
+                              newSelected.add(mediaId)
+                            } else {
+                              newSelected.delete(mediaId)
+                            }
+                            setSelectedMediaIds(newSelected)
+                          }}
+                        />
+                        <Label htmlFor={`media-${mediaId}`} className="flex-1 cursor-pointer">
+                          <div className="font-medium">{media.title}</div>
+                          <div className="text-sm text-muted-foreground">{media.description}</div>
+                        </Label>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                disabled={selectedMediaIds.size === 0 || !currentSectionId}
+                onClick={async () => {
+                  if (!currentSectionId) return
+
+                  try {
+                    // Add each selected media to the section
+                    const promises = Array.from(selectedMediaIds).map(mediaId => {
+                      return addMediaToSectionMutation({
+                        sectionId: currentSectionId,
+                        mediaId: mediaId as Id<"medias">,
+                        isOptional: false, // Not optional by default
+                        defaultSelected: true // Selected by default when adding
+                      })
+                    })
+
+                    await Promise.all(promises)
+
+                    toast.success(`Added ${selectedMediaIds.size} media items to section`)
+                    setIsAddingMedia(false)
+                    setSelectedMediaIds(new Set())
+                  } catch (error) {
+                    console.error("Error adding media:", error)
+                    toast.error("Failed to add media to section")
+                  }
+                }}
+              >
+                Add Selected Media
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
       )
 }

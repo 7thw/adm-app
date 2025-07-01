@@ -20,7 +20,9 @@ permalink: task-genius-rules
 
 # Task Genius Rules & Guidelines
 
-Task Rules Path: (/Users/macdadyo/_MEM/__RULES/tasks-genius_RULES.md)
+- **Always** use mcp: basic-memory to access and interact with tasks.
+- Task Rules Path: (/Users/macdadyo/_MEM/__RULES/tasks-genius_RULES.md)
+- Task Projects Path: (/Users/macdadyo/_MEM/_PROJECTS/** `<project-name>`/** /TASKS)
 
 A comprehensive ruleset for task management using Task Genius syntax and features, designed for both humans and AIs working with tasks in Obsidian and Basic Memory.
 

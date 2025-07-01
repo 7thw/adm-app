@@ -110,13 +110,9 @@ function DragHandle({ id }: { id: Id<"coreSections"> }) {
 }
 
 function DraggableRow<TData extends TableData>({
-  row,
-  onEdit,
-  onDelete
+  row
 }: {
   row: Row<TData>
-  onEdit?: (item: TData) => void
-  onDelete?: (item: TData) => void
 }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original._id.toString(),
@@ -159,7 +155,6 @@ export function DataTable<TData extends TableData>({
   })
 
   // Convex mutations
-  const updateSection = useMutation(api.admin.updateCoreSection)
   const deleteSection = useMutation(api.admin.removeCoreSection)
   const reorderSections = useMutation(api.admin.reorderCoreSections)
   // TODO: Add duplicate function to coreSections API
@@ -394,7 +389,8 @@ export function DataTable<TData extends TableData>({
     } else {
       // Default behavior if no callback provided
       if (data.length > 0 && '_id' in data[0]) {
-        const playlistId = (data[0] as any).corePlaylistId
+        const section = data[0] as Doc<"coreSections">
+        const playlistId = section.corePlaylistId
         window.location.href = `/dashboard/core-playlists/${playlistId}/sections/new`
       } else {
         toast.error("Cannot determine playlist ID for new section")

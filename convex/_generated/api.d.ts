@@ -9,10 +9,12 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
+import type * as clerkSync from "../clerkSync.js";
 import type * as http from "../http.js";
-import type * as internal_auth from "../internal/auth.js";
 import type * as internal_webhooks from "../internal/webhooks.js";
+import type * as r2Upload from "../r2Upload.js";
 import type * as router from "../router.js";
 import type * as subscribers from "../subscribers.js";
 import type * as webhooks from "../webhooks.js";
@@ -33,10 +35,12 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  analytics: typeof analytics;
   auth: typeof auth;
+  clerkSync: typeof clerkSync;
   http: typeof http;
-  "internal/auth": typeof internal_auth;
   "internal/webhooks": typeof internal_webhooks;
+  r2Upload: typeof r2Upload;
   router: typeof router;
   subscribers: typeof subscribers;
   webhooks: typeof webhooks;

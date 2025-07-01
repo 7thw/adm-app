@@ -2,9 +2,7 @@
 
 import { useUser } from '@clerk/nextjs'
 import { useConvexAuth } from 'convex/react'
-import { useQuery } from 'convex/react'
-import { api } from '@/convex/_generated/api'
-import { useEffect } from 'react'
+
 
 /**
  * Custom hook for authentication state management

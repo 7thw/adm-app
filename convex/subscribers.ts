@@ -1,9 +1,10 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
+import { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 // Helper function to check subscriber access
-async function requireSubscriberAccess(ctx: QueryCtx | MutationCtx) {
+async function requireSubscriberAccess(ctx: QueryCtx | MutationCtx): Promise<{ userId: Id<"users">; profile: Doc<"userProfiles"> }> {
   const userId = await getAuthUserId(ctx);
   if (!userId) {
     throw new Error("Authentication required");
@@ -36,7 +37,7 @@ async function requireSubscriberAccess(ctx: QueryCtx | MutationCtx) {
 
 export const getPublishedPlaylists = query({
   args: { categoryId: v.optional(v.id("coreCategories")) },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any[]> => {
     await requireSubscriberAccess(ctx);
 
     let playlists;
@@ -112,7 +113,7 @@ export const getPublishedPlaylists = query({
 
 export const getPlaylistDetails = query({
   args: { playlistId: v.id("corePlaylists") },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any> => {
     await requireSubscriberAccess(ctx);
 
     const playlist = await ctx.db.get(args.playlistId);
@@ -175,7 +176,7 @@ export const getPlaylistDetails = query({
 
 export const getUserPlaylists = query({
   args: { activeOnly: v.optional(v.boolean()) },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Doc<"userPlaylists">[]> => {
     const { userId } = await requireSubscriberAccess(ctx);
 
     if (args.activeOnly) {
@@ -202,7 +203,7 @@ export const createUserPlaylist = mutation({
     title: v.string(),
     mediaSelections: v.string(), // JSON string of selected media per section
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Id<"userPlaylists">> => {
     const { userId } = await requireSubscriberAccess(ctx);
 
     // Validate core playlist exists and is published
@@ -261,7 +262,7 @@ export const updateUserPlaylist = mutation({
     mediaSelections: v.optional(v.string()),
     isFavorite: v.optional(v.boolean()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<void> => {
     const { userId } = await requireSubscriberAccess(ctx);
 
     const userPlaylist = await ctx.db.get(args.userPlaylistId);
@@ -323,10 +324,10 @@ export const updateUserPlaylist = mutation({
 
 export const getUserPlayerSettings = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<any> => {
     const { userId } = await requireSubscriberAccess(ctx);
 
-    let settings = await ctx.db
+    const settings = await ctx.db
       .query("userPlayerSettings")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
@@ -369,10 +370,10 @@ export const updatePlayerSettings = mutation({
     wifiOnlyDownload: v.optional(v.boolean()),
     autoSync: v.optional(v.boolean()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean }> => {
     const { userId } = await requireSubscriberAccess(ctx);
 
-    let settings = await ctx.db
+    const settings = await ctx.db
       .query("userPlayerSettings")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
@@ -418,7 +419,7 @@ export const updatePlaybackProgress = mutation({
     timeSpent: v.optional(v.number()),
     completed: v.optional(v.boolean()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean }> => {
     const { userId } = await requireSubscriberAccess(ctx);
 
     // Verify playlist ownership

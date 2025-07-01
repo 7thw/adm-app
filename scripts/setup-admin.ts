@@ -1,7 +1,13 @@
 // Set Admin User in Clerk
 // This is a one-time setup script to configure admin access
 
-import { clerkClient } from "@clerk/nextjs/server";
+import { clerkClient, User } from "@clerk/nextjs/server";
+
+// Define a type for the user's public metadata for type safety
+interface UserPublicMetadata {
+  role?: "admin" | "subscriber";
+  permissions?: string[];
+}
 
 /**
  * Set admin status for a user by email
@@ -53,7 +59,7 @@ async function checkAdminStatus(email: string) {
     }
 
     const user = users[0];
-    const metadata = user.publicMetadata as any;
+    const metadata = user.publicMetadata as UserPublicMetadata;
     const isAdmin = metadata?.role === "admin";
 
     console.log(`User: ${email}`);

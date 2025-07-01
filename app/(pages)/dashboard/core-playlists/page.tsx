@@ -2,10 +2,11 @@
 
 import { api } from "@/convex/_generated/api";
 import { Doc, Id } from "@/convex/_generated/dataModel";
-import { useQuery } from "convex/react";
-import { Edit, Link, List, Loader2, PlusCircle, Search } from "lucide-react";
+import { useQuery, useMutation } from "convex/react";
+import { Copy, Edit, Link, List, Loader2, PlusCircle, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,9 @@ export default function CorePlaylistsPage() {
 
   // Get categories to display category names
   const categories = useQuery(api.admin.listCoreCategories, {}) || [];
+
+  // Mutations for playlist operations
+  const duplicatePlaylist = useMutation(api.admin.duplicateCorePlaylist);
 
   // Loading state based on Convex query
   const isLoading = playlists === undefined;
@@ -44,6 +48,24 @@ export default function CorePlaylistsPage() {
   // Handler for creating new playlist
   const handleCreatePlaylist = () => {
     router.push("/dashboard/core-playlists/new");
+  };
+
+  // Handler for duplicating playlist
+  const handleDuplicatePlaylist = async (playlist: Doc<"corePlaylists">) => {
+    try {
+      const newTitle = `${playlist.title} (Copy)`;
+      const newPlaylistId = await duplicatePlaylist({
+        sourcePlaylistId: playlist._id,
+        newTitle,
+        keepSections: true, // Include sections in the duplicate
+      });
+      
+      toast.success(`Playlist duplicated successfully!`);
+      router.push(`/dashboard/core-playlists/${newPlaylistId}/edit`);
+    } catch (error) {
+      console.error("Error duplicating playlist:", error);
+      toast.error("Failed to duplicate playlist");
+    }
   };
 
   return (
@@ -104,16 +126,27 @@ export default function CorePlaylistsPage() {
                 </div>
               </CardContent>
               <CardFooter className="flex">
-                <div className="flex w-full justify-between">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push(`/dashboard/core-playlists/${playlist._id}/preview`)}
-                    className="gap-2"
-                  >
-                    <Link className="h-4 w-4" />
-                    Mobile Preview
-                  </Button>
+                <div className="flex w-full justify-between items-center gap-2">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/dashboard/core-playlists/${playlist._id}/preview`)}
+                      className="gap-2"
+                    >
+                      <Link className="h-4 w-4" />
+                      Mobile Preview
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDuplicatePlaylist(playlist)}
+                      className="gap-2"
+                    >
+                      <Copy className="h-4 w-4" />
+                      Duplicate
+                    </Button>
+                  </div>
                   <Button
                     variant="default"
                     size="sm"
@@ -124,7 +157,6 @@ export default function CorePlaylistsPage() {
                     Edit corePlaylist
                   </Button>
                 </div>
-
               </CardFooter>
             </Card>
           ))}

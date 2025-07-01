@@ -45,7 +45,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ClerkProvider>
+          <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up">
             <ConvexClientProviderWithClerk>
               {children}
             </ConvexClientProviderWithClerk>

@@ -1,6 +1,15 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { authTables } from "@convex-dev/auth/server";
+const authTables = {
+  users: defineTable({
+    tokenIdentifier: v.string(),
+  }).index("by_token", ["tokenIdentifier"]),
+  sessions: defineTable({
+    userId: v.id("users"),
+    sessionKey: v.string(),
+    expires: v.number(),
+  }).index("by_userId", ["userId"]),
+};
 
 const applicationTables = {
   // =================================================================
@@ -110,9 +119,11 @@ const applicationTables = {
   mediaTags: defineTable({
     mediaId: v.id("medias"),
     tag: v.string(),
+    createdAt: v.number(),
   })
     .index("by_media", ["mediaId"])
-    .index("by_tag", ["tag"]),
+    .index("by_tag", ["tag"])
+    .index("by_media_tag", ["mediaId", "tag"]),
 
   // Core playlists (admin-managed templates)
   corePlaylists: defineTable({
@@ -121,11 +132,6 @@ const applicationTables = {
     thumbnailStorageId: v.optional(v.id("_storage")),
     status: v.union(v.literal("draft"), v.literal("published")),
     categoryId: v.id("coreCategories"),
-    difficulty: v.optional(v.union(
-      v.literal("beginner"),
-      v.literal("intermediate"),
-      v.literal("advanced")
-    )),
     estimatedDuration: v.optional(v.number()), // in minutes
     playCount: v.number(),
     averageRating: v.optional(v.number()),
@@ -363,6 +369,47 @@ const applicationTables = {
     .index("by_user", ["uploadedBy"])
     .index("by_media", ["mediaId"])
     .index("by_storage_id", ["storageId"]),
+
+  // =================================================================
+  // ANALYTICS TRACKING
+  // =================================================================
+
+  installAnalytics: defineTable({
+    event: v.string(), // 'install_prompt_shown' | 'install_success' | 'install_dismissed' | 'install_error'
+    platform: v.string(), // 'mobile' | 'desktop' | 'unknown'
+    variant: v.string(), // 'card' | 'button' | 'banner'
+    context: v.optional(v.string()), // A/B test variant or additional context
+    userAgent: v.optional(v.string()),
+    timestamp: v.number(),
+    sessionId: v.optional(v.string()),
+    userId: v.optional(v.string()), // Can be null for anonymous tracking
+    userEmail: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_event", ["event"])
+    .index("by_platform", ["platform"])
+    .index("by_variant", ["variant"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_user", ["userId"])
+    .index("by_session", ["sessionId"])
+    .index("by_event_platform", ["event", "platform"])
+    .index("by_timestamp_event", ["timestamp", "event"]),
+
+  userAnalytics: defineTable({
+    event: v.string(), // Event name
+    properties: v.optional(v.any()), // Event properties as JSON
+    sessionId: v.optional(v.string()),
+    userId: v.optional(v.string()),
+    userEmail: v.optional(v.string()),
+    timestamp: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_event", ["event"])
+    .index("by_user", ["userId"])
+    .index("by_session", ["sessionId"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_user_event", ["userId", "event"])
+    .index("by_timestamp_event", ["timestamp", "event"]),
 };
 
 export default defineSchema({

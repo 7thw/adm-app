@@ -47,6 +47,8 @@
     "@tabler/icons-react": "^3.34.0",
     "@tanstack/react-table": "^8.21.3",
     "@vercel/mcp-adapter": "^0.11.1",
+    "@clerk/clerk-sdk-node": "^5.0.1",
+    "svix": "^1.24.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.25.0",
