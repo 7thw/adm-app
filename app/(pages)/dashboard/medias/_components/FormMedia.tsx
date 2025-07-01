@@ -10,7 +10,8 @@ import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
 import { useUploadFile } from "@convex-dev/r2/react"
 import { useMutation } from "convex/react"
-import { FileAudio, Loader2, Music, Video, X } from "lucide-react"
+import { FileAudio, Loader2, Music, Video } from "lucide-react"
+import Image from "next/image"
 import { FormEvent, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
@@ -203,7 +204,13 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
         {/* Preview Section */}
         <div className="h-40 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
           {previewUrl && mediaType === "video" ? (
-            <img src={previewUrl} alt={title} className="w-full h-full object-cover" />
+            <Image 
+              src={previewUrl} 
+              alt={title} 
+              width={400} 
+              height={160} 
+              className="w-full h-full object-cover" 
+            />
           ) : selectedFile && mediaType === "audio" ? (
             <div className="text-center text-muted-foreground p-4">
               <Music className="h-12 w-12 mx-auto" />

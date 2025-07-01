@@ -1,6 +1,7 @@
 "use client"
 
 import { AlertCircleIcon, ImageIcon, UploadIcon, XIcon } from "lucide-react"
+import Image from "next/image"
 
 import { useFileUpload } from "@/hooks/use-file-upload"
 import { Button } from "@/components/ui/button"
@@ -25,7 +26,6 @@ export default function Component() {
     maxSize,
   })
   const previewUrl = files[0]?.preview || null
-  const fileName = files[0]?.file.name || null
 
   return (
     <div className="flex flex-col gap-2">
@@ -46,9 +46,11 @@ export default function Component() {
           />
           {previewUrl ? (
             <div className="absolute inset-0 flex items-center justify-center p-4">
-              <img
+              <Image
                 src={previewUrl}
                 alt={files[0]?.file?.name || "Uploaded image"}
+                width={200}
+                height={200}
                 className="mx-auto max-h-full rounded object-contain"
               />
             </div>

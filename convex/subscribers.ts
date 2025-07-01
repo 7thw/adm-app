@@ -63,7 +63,7 @@ export const getPublishedCorePlaylists = query({
       playlists.map(async (playlist) => {
         const sections = await ctx.db
           .query("coreSections")
-          .withIndex("by_playlist_order", (q) => q.eq("playlistId", playlist._id))
+          .withIndex("by_core_playlist_order", (q) => q.eq("corePlaylistId", playlist._id))
           .order("asc")
           .collect();
 
@@ -124,7 +124,7 @@ export const getCorePlaylistDetails = query({
     // Get sections with media
     const sections = await ctx.db
       .query("coreSections")
-      .withIndex("by_playlist_order", (q) => q.eq("playlistId", args.playlistId))
+      .withIndex("by_core_playlist_order", (q) => q.eq("corePlaylistId", args.playlistId))
       .order("asc")
       .collect();
 

@@ -28,7 +28,7 @@ interface DraggableContainerProps<T extends { id: UniqueIdentifier }> {
   children: React.ReactNode
   className?: string
   strategy?: "vertical" | "horizontal"
-  modifiers?: any[]
+  modifiers?: typeof restrictToVerticalAxis[]
 }
 
 export function DraggableContainer<T extends { id: UniqueIdentifier }>({

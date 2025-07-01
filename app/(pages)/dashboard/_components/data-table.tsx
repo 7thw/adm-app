@@ -51,7 +51,6 @@ import {
 import * as React from "react"
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { toast } from "sonner"
-import { Doc } from "@/convex/_generated/dataModel"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

@@ -32,7 +32,6 @@ export function MediaPlayerModal({
   isOpen,
   onClose,
   media,
-  autoPlay = false
 }: MediaPlayerModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from "convex/react"
 import { SaveIcon, Upload, X } from "lucide-react"
 import Image from "next/image"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import { toast } from "sonner"
 
 import { Button, buttonVariants } from "@/components/ui/button"

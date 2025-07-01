@@ -10,7 +10,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar
 } from "@/components/ui/sidebar"
 
 export function NavSubscriptions({
@@ -22,8 +21,6 @@ export function NavSubscriptions({
     icon: Icon
   }[]
 }) {
-  const { isMobile } = useSidebar()
-
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Subscriptions</SidebarGroupLabel>

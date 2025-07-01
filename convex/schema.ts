@@ -147,7 +147,7 @@ const applicationTables = {
 
   // Sections within core playlists
   coreSections: defineTable({
-    playlistId: v.id("corePlaylists"),
+    corePlaylistId: v.id("corePlaylists"),
     title: v.string(),
     description: v.optional(v.string()),
     sectionType: v.union(v.literal("base"), v.literal("loop")),
@@ -157,8 +157,8 @@ const applicationTables = {
     isRequired: v.boolean(),
     estimatedDuration: v.optional(v.number()),
   })
-    .index("by_playlist", ["playlistId"])
-    .index("by_playlist_order", ["playlistId", "order"])
+    .index("by_core_playlist", ["corePlaylistId"])
+    .index("by_core_playlist_order", ["corePlaylistId", "order"])
     .index("by_type", ["sectionType"]),
 
   // Media items within sections
@@ -283,7 +283,7 @@ const applicationTables = {
     userId: v.id("users"),
     eventType: v.string(), // "playlist_created", "media_played", etc.
     eventData: v.optional(v.string()), // JSON string of event details
-    playlistId: v.optional(v.id("userPlaylists")),
+    userPlaylistId: v.optional(v.id("userPlaylists")),
     mediaId: v.optional(v.id("medias")),
     sessionId: v.optional(v.string()),
     deviceType: v.optional(v.string()),

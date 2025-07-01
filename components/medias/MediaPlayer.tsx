@@ -198,15 +198,7 @@ export default function MediaPlayer({
     }
   }, [title])
 
-  if (!src) {
-    return (
-      <div className={`p-4 border rounded-lg bg-muted ${className}`}>
-        <p className="text-sm text-muted-foreground">No audio source available</p>
-      </div>
-    )
-  }
-
-  // Process and validate the source URL
+  // Process and validate the source URL - MOVED BEFORE CONDITIONAL RETURN
   useEffect(() => {
     // Reset error state when src changes
     setError(null);
@@ -228,6 +220,14 @@ export default function MediaPlayer({
     // Log URL for debugging but don't display in UI
     console.log('MediaPlayer source URL:', src);
   }, [src, onError]);
+
+  if (!src) {
+    return (
+      <div className={`p-4 border rounded-lg bg-muted ${className}`}>
+        <p className="text-sm text-muted-foreground">No audio source available</p>
+      </div>
+    )
+  }
 
   return (
     <div className={`p-4 border rounded-lg bg-card shadow-sm ${className}`}>

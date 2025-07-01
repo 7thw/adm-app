@@ -12,6 +12,7 @@ import {
   IconPlus,
   IconTrashFilled
 } from "@tabler/icons-react"
+import { MediaCellPlayer } from "@/components/medias/MediaCellPlayer"
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -171,108 +172,7 @@ export const columns: ColumnDef<Doc<"medias">>[] = [
     id: "play",
     header: "",
     cell: ({ row }) => {
-      // Access the media data for the current row
-      const media = row.original
-      const [openPlayer, setOpenPlayer] = React.useState(false)
-      const [isClient, setIsClient] = React.useState(false)
-
-      React.useEffect(() => {
-        setIsClient(true)
-      }, [])
-
-      // Helper function to get the media URL
-      const getMediaUrl = () => {
-        // Use storageId to generate URL or use embedUrl if available
-        if (media.storageId) {
-          return `/api/media/${media.storageId}`
-        } else if (media.embedUrl) {
-          return media.embedUrl
-        } else if (media.youtubeId) {
-          return `https://www.youtube.com/watch?v=${media.youtubeId}`
-        }
-        return ""
-      }
-
-      // Helper function to determine if media is playable
-      const isPlayable = () => {
-        return media.mediaType === "audio" && (media.storageId || media.embedUrl || media.youtubeId)
-      }
-
-      // Helper function to determine media source type
-      const getMediaSourceType = () => {
-        if (media.storageId) return "storage"
-        if (media.embedUrl) return "embed"
-        if (media.youtubeId) return "youtube"
-        return "unknown"
-      }
-
-      // Get the media URL using our helper function
-      const mediaUrl = getMediaUrl();
-
-      // Media URL checking
-      const hasUrl = mediaUrl && mediaUrl !== "" && mediaUrl !== "undefined";
-      const isAudio = media.mediaType === "audio";
-      const playerType = isAudio ? "audio" : "video";
-      const canPlay = hasUrl && media.mediaType;
-
-      // Function to open the player dialog
-      const openMediaPlayer = () => {
-        if (canPlay) setOpenPlayer(true);
-      };
-
-      if (!canPlay) {
-        return (
-          <Button
-            variant="ghost"
-            size="icon"
-            disabled
-            className="text-muted-foreground/50"
-            title="Media URL not available"
-          >
-            <IconPlayerPlayFilled className="h-4 w-4" />
-            <span className="sr-only">No media available</span>
-          </Button>
-        );
-      }
-
-      return (
-        <Dialog open={openPlayer && isClient} onOpenChange={setOpenPlayer}>
-          <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={openMediaPlayer}
-              className="text-muted-foreground hover:text-primary"
-              title={`Play ${media.title}`}
-            >
-              <IconPlayerPlayFilled className="h-4 w-4" />
-              <span className="sr-only">Play {media.title}</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Play Media</DialogTitle>
-            </DialogHeader>
-            <MediaPlayer
-              className="flex-1 w-[100%]"
-              src={mediaUrl}
-              title={media.title}
-              description={media.description || ""}
-              onError={(error) => {
-                console.error("Media playback error:", error);
-                toast.error(`Playback failed: ${error}`);
-              }}
-            />
-            <div className="flex-1">
-              <MediaInfo
-                media={media}
-                url={mediaUrl}
-                showDebugInfo={false}
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
-      );
+      return <MediaCellPlayer media={row.original} />
     },
   },
   {
