@@ -26,13 +26,13 @@ export default function NewCorePlaylistPage() {
               <span className="sr-only">Back</span>
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold">Create New Core corePlaylist</h1>
+          <h1 className="text-2xl font-bold">Create New Core Playlist</h1>
         </div>
       </div>
 
       <PlaylistForm
         onSuccess={handleSuccess}
-        submitLabel="Create corePlaylist"
+        submitLabel="Create Core Playlist"
       />
     </div>
   )

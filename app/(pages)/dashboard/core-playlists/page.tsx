@@ -77,7 +77,7 @@ export default function CorePlaylistsPage() {
         </div>
         <Button onClick={handleCreatePlaylist}>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Create corePlaylist
+          Create Core Playlist
         </Button>
       </div>
 
@@ -154,7 +154,7 @@ export default function CorePlaylistsPage() {
                     className="gap-2"
                   >
                     <Edit className="h-4 w-4" />
-                    Edit corePlaylist
+                    Edit Core Playlist
                   </Button>
                 </div>
               </CardFooter>

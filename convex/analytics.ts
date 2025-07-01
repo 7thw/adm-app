@@ -1,6 +1,5 @@
-import { mutation, query } from './_generated/server'
-import { v } from 'convex/values'
-import { auth } from './auth'
+import { v } from 'convex/values';
+import { mutation, query } from './_generated/server';
 
 /**
  * Track PWA installation analytics events
@@ -17,19 +16,25 @@ export const trackInstallEvent = mutation({
   },
   handler: async (ctx, args) => {
     // Get user identity (can be null for anonymous tracking)
-    const identity = await auth.getUserIdentity(ctx)
-    
-    await ctx.db.insert('installAnalytics', {
-      event: args.event,
-      platform: args.platform || 'unknown',
-      variant: args.variant || 'unknown',
-      context: args.context,
-      userAgent: args.userAgent,
-      timestamp: args.timestamp || Date.now(),
-      sessionId: args.sessionId,
-      userId: identity?.subject || null,
-      userEmail: identity?.email || null,
-      createdAt: Date.now()
+    const identity = await ctx.auth.getUserIdentity()
+
+    // Only track for authenticated users, skip anonymous tracking for now
+    if (!identity?.subject) {
+      return;
+    }
+
+    await ctx.db.insert('analyticsEvents', {
+      userId: identity.subject as any, // Cast to Id<"users">
+      eventType: args.event,
+      eventData: JSON.stringify({
+        platform: args.platform || 'unknown',
+        variant: args.variant || 'unknown',
+        context: args.context
+      }),
+      sessionId: args.sessionId || undefined,
+      deviceType: args.platform || undefined,
+      userAgent: args.userAgent || undefined,
+      timestamp: args.timestamp || Date.now()
     })
   }
 })
@@ -44,17 +49,17 @@ export const getInstallAnalytics = query({
   },
   handler: async (ctx, args) => {
     // Require admin access
-    const identity = await auth.getUserIdentity(ctx)
+    const identity = await ctx.auth.getUserIdentity()
     if (!identity) {
       throw new Error('Authentication required')
     }
-    
+
     // Check if user is admin (implement your admin check logic)
     // For now, just check if user exists
-    
+
     const timeframe = args.timeframe || '7d'
     const now = Date.now()
-    
+
     let timeframeCutoff = 0
     switch (timeframe) {
       case '24h':
@@ -69,12 +74,12 @@ export const getInstallAnalytics = query({
       default:
         timeframeCutoff = 0
     }
-    
+
     const analytics = await ctx.db
       .query('installAnalytics')
       .filter(q => q.gte(q.field('timestamp'), timeframeCutoff))
       .collect()
-    
+
     // Group and aggregate the data
     const summary = {
       totalEvents: analytics.length,
@@ -86,26 +91,26 @@ export const getInstallAnalytics = query({
       platforms: {} as Record<string, number>,
       variants: {} as Record<string, number>
     }
-    
+
     // Calculate conversion rate
     if (summary.promptsShown > 0) {
       summary.conversionRate = (summary.installs / summary.promptsShown) * 100
     }
-    
+
     // Group by platform
     analytics.forEach(event => {
       if (event.platform) {
         summary.platforms[event.platform] = (summary.platforms[event.platform] || 0) + 1
       }
     })
-    
+
     // Group by variant
     analytics.forEach(event => {
       if (event.variant) {
         summary.variants[event.variant] = (summary.variants[event.variant] || 0) + 1
       }
     })
-    
+
     return summary
   }
 })
@@ -122,32 +127,32 @@ export const getInstallAnalyticsDetail = query({
   },
   handler: async (ctx, args) => {
     // Require admin access
-    const identity = await auth.getUserIdentity(ctx)
+    const identity = await ctx.auth.getUserIdentity()
     if (!identity) {
       throw new Error('Authentication required')
     }
-    
+
     let query = ctx.db
       .query('installAnalytics')
-      .filter(q => 
+      .filter(q =>
         q.and(
           q.gte(q.field('timestamp'), args.startDate),
           q.lte(q.field('timestamp'), args.endDate)
         )
       )
-    
+
     if (args.platform) {
       query = query.filter(q => q.eq(q.field('platform'), args.platform))
     }
-    
+
     if (args.variant) {
       query = query.filter(q => q.eq(q.field('variant'), args.variant))
     }
-    
+
     const analytics = await query
       .order('desc')
       .take(1000) // Limit to 1000 records for performance
-    
+
     return analytics
   }
 })
@@ -162,14 +167,14 @@ export const trackUserEvent = mutation({
     sessionId: v.optional(v.string())
   },
   handler: async (ctx, args) => {
-    const identity = await auth.getUserIdentity(ctx)
-    
+    const identity = await ctx.auth.getUserIdentity()
+
     await ctx.db.insert('userAnalytics', {
       event: args.event,
       properties: args.properties,
       sessionId: args.sessionId,
-      userId: identity?.subject || null,
-      userEmail: identity?.email || null,
+      userId: identity?.subject,
+      userEmail: identity?.email,
       timestamp: Date.now(),
       createdAt: Date.now()
     })

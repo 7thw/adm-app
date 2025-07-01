@@ -525,7 +525,7 @@ export default function CorePlaylistEditPage() {
             <ArrowLeftIcon className="h-4 w-4" />
             <span className="sr-only">Back</span>
           </Button>
-          <h1 className="text-l font-bold">Edit Core corePlaylist</h1>
+          <h1 className="text-l font-bold">Edit Core Playlist</h1>
         </div>
 
         {/* Delete Button and Dialog */}
@@ -557,7 +557,7 @@ export default function CorePlaylistEditPage() {
                 className="gap-2"
               >
                 <SaveIcon className="h-4 w-4" />
-                {isSaving ? "Saving..." : "Save Core corePlaylist"}
+                {isSaving ? "Saving..." : "Save Core Playlist"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -566,7 +566,7 @@ export default function CorePlaylistEditPage() {
         {/* Core corePlaylist metadata */}
         <Card>
           <CardHeader>
-            <CardTitle>corePlaylist Details</CardTitle>
+            <CardTitle>Playlist Details</CardTitle>
             <CardDescription>Basic information about the playlist</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -633,7 +633,7 @@ export default function CorePlaylistEditPage() {
         {/* Sections */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">corePlaylist Sections</h2>
+            <h2 className="text-xl font-semibold">Playlist Sections</h2>
             <Sheet open={isAddingSectionOpen} onOpenChange={setIsAddingSectionOpen}>
               <SheetTrigger asChild>
                 <Button

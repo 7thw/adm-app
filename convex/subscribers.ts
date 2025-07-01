@@ -1,7 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
-import { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
+import { Doc, Id } from "./_generated/dataModel";
+import { mutation, MutationCtx, query, QueryCtx } from "./_generated/server";
 
 // Helper function to check subscriber access
 async function requireSubscriberAccess(ctx: QueryCtx | MutationCtx): Promise<{ userId: Id<"users">; profile: Doc<"userProfiles"> }> {
@@ -20,9 +20,9 @@ async function requireSubscriberAccess(ctx: QueryCtx | MutationCtx): Promise<{ u
   }
 
   // Check active subscription
-  const hasActiveSubscription = profile.subscriptionStatus === "active" && 
-                               profile.isActive &&
-                               (!profile.subscriptionExpiresAt || profile.subscriptionExpiresAt > Date.now());
+  const hasActiveSubscription = profile.subscriptionStatus === "active" &&
+    profile.isActive &&
+    (!profile.subscriptionExpiresAt || profile.subscriptionExpiresAt > Date.now());
 
   if (!hasActiveSubscription) {
     throw new Error("Active subscription required");
@@ -35,7 +35,7 @@ async function requireSubscriberAccess(ctx: QueryCtx | MutationCtx): Promise<{ u
 // PUBLISHED CONTENT ACCESS
 // =================================================================
 
-export const getPublishedPlaylists = query({
+export const getPublishedCorePlaylists = query({
   args: { categoryId: v.optional(v.id("coreCategories")) },
   handler: async (ctx, args): Promise<any[]> => {
     await requireSubscriberAccess(ctx);
@@ -45,7 +45,7 @@ export const getPublishedPlaylists = query({
     if (args.categoryId) {
       playlists = await ctx.db
         .query("corePlaylists")
-        .withIndex("by_category_status", (q) => 
+        .withIndex("by_category_status", (q) =>
           q.eq("categoryId", args.categoryId!).eq("status", "published")
         )
         .order("desc")
@@ -83,8 +83,8 @@ export const getPublishedPlaylists = query({
                 return {
                   ...media,
                   url: media.storageId ? await ctx.storage.getUrl(media.storageId) : media.embedUrl,
-                  thumbnailUrl: media.thumbnailStorageId 
-                    ? await ctx.storage.getUrl(media.thumbnailStorageId) 
+                  thumbnailUrl: media.thumbnailStorageId
+                    ? await ctx.storage.getUrl(media.thumbnailStorageId)
                     : media.thumbnailUrl,
                   sectionMediaInfo: {
                     order: sm.order,
@@ -111,14 +111,14 @@ export const getPublishedPlaylists = query({
   },
 });
 
-export const getPlaylistDetails = query({
+export const getCorePlaylistDetails = query({
   args: { playlistId: v.id("corePlaylists") },
   handler: async (ctx, args): Promise<any> => {
     await requireSubscriberAccess(ctx);
 
     const playlist = await ctx.db.get(args.playlistId);
     if (!playlist || playlist.status !== "published") {
-      throw new Error("Playlist not found or not published");
+      throw new Error("Core playlist not found or not published");
     }
 
     // Get sections with media
@@ -144,8 +144,8 @@ export const getPlaylistDetails = query({
             return {
               ...media,
               url: media.storageId ? await ctx.storage.getUrl(media.storageId) : media.embedUrl,
-              thumbnailUrl: media.thumbnailStorageId 
-                ? await ctx.storage.getUrl(media.thumbnailStorageId) 
+              thumbnailUrl: media.thumbnailStorageId
+                ? await ctx.storage.getUrl(media.thumbnailStorageId)
                 : media.thumbnailUrl,
               sectionMediaInfo: {
                 order: sm.order,
@@ -171,6 +171,106 @@ export const getPlaylistDetails = query({
 });
 
 // =================================================================
+// DEBUGGING/DIAGNOSTIC FUNCTIONS
+// =================================================================
+
+export const debugUserAuth = query({
+  handler: async (ctx): Promise<any> => {
+    try {
+      const userId = await getAuthUserId(ctx);
+      console.log("Debug: userId from getAuthUserId:", userId);
+
+      if (!userId) {
+        return {
+          status: "no_auth",
+          message: "No authentication found"
+        };
+      }
+
+      const user = await ctx.db.get(userId);
+      console.log("Debug: user from db:", user);
+
+      const profile = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+      console.log("Debug: profile from db:", profile);
+
+      return {
+        status: "authenticated",
+        userId,
+        hasUser: !!user,
+        hasProfile: !!profile,
+        user: user ? {
+          id: user._id,
+          tokenIdentifier: user.tokenIdentifier,
+          name: "User", // User object doesn't have name property
+          email: "unknown@example.com", // User object doesn't have email property
+        } : null,
+        profile: profile ? {
+          id: profile._id,
+          email: profile.email,
+          role: profile.role,
+          subscriptionStatus: profile.subscriptionStatus,
+        } : null,
+      };
+    } catch (error) {
+      console.error("Debug auth error:", error);
+      return {
+        status: "error",
+        message: error as string
+      };
+    }
+  },
+});
+
+// =================================================================
+// USER PROFILE MANAGEMENT (PWA App Fallback)
+// =================================================================
+
+export const ensureUserProfile = mutation({
+  handler: async (ctx): Promise<Doc<"userProfiles"> | null> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
+
+    // Check if profile exists
+    let profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (!profile) {
+      // Get user details from Clerk/auth
+      const user = await ctx.db.get(userId);
+      if (!user) {
+        throw new Error("User not found in users table");
+      }
+
+      // Create new profile with default subscriber status
+      const profileId = await ctx.db.insert("userProfiles", {
+        userId,
+        clerkUserId: user.tokenIdentifier?.split("|")[1] || "unknown",
+        email: "unknown@example.com", // User object doesn't have email property
+        firstName: "User", // User object doesn't have name property
+        lastName: "", // User object doesn't have name property
+        imageUrl: undefined, // User object doesn't have image property
+        role: "subscriber",
+        subscriptionStatus: "inactive", // Default to inactive
+        lastActiveAt: Date.now(),
+        isActive: true,
+      });
+
+      profile = await ctx.db.get(profileId);
+      console.log(`Created new user profile for user: ${userId}`);
+    }
+
+    return profile;
+  },
+});
+
+// =================================================================
 // USER PLAYLIST MANAGEMENT
 // =================================================================
 
@@ -182,7 +282,7 @@ export const getUserPlaylists = query({
     if (args.activeOnly) {
       return await ctx.db
         .query("userPlaylists")
-        .withIndex("by_user_active", (q) => 
+        .withIndex("by_user_active", (q) =>
           q.eq("userId", userId).eq("isActive", true)
         )
         .order("desc")
@@ -262,7 +362,7 @@ export const updateUserPlaylist = mutation({
     mediaSelections: v.optional(v.string()),
     isFavorite: v.optional(v.boolean()),
   },
-  handler: async (ctx, args): Promise<void> => {
+  handler: async (ctx, args): Promise<{ success: boolean }> => {
     const { userId } = await requireSubscriberAccess(ctx);
 
     const userPlaylist = await ctx.db.get(args.userPlaylistId);
@@ -278,11 +378,11 @@ export const updateUserPlaylist = mutation({
     if (args.isFavorite !== undefined) updates.isFavorite = args.isFavorite;
     if (args.mediaSelections) {
       updates.customizations = args.mediaSelections;
-      
+
       // Update individual media selections if provided
       try {
         const selections = JSON.parse(args.mediaSelections);
-        
+
         // Remove existing selections
         const existingSelections = await ctx.db
           .query("userMediaSelections")

@@ -61,9 +61,9 @@ export function PlaylistForm({
   const categories = useQuery(api.admin.listCoreCategories, {})
 
   // Mutations
-  const createPlaylist = useMutation(api.admin.createCorePlaylist)
-  const updatePlaylist = useMutation(api.admin.updateCorePlaylist)
-  // const generateUploadUrl = useMutation(api.r2Upload.generateUploadUrl) // Temporarily disabled
+  const createCorePlaylist = useMutation(api.admin.createCorePlaylist)
+  const updateCorePlaylist = useMutation(api.admin.updateCorePlaylist)
+  const generateUploadUrl = useMutation(api.admin.generateUploadUrl)
 
   // Temporarily disable thumbnail fetching logic
   /*
@@ -123,8 +123,8 @@ export function PlaylistForm({
       // 2. Create or update the playlist
       if (isEdit && initialData?._id) {
         // Update existing playlist
-        await updatePlaylist({
-          id: initialData._id,
+        await updateCorePlaylist({
+          corePlaylistId: initialData._id,
           title,
           description,
           categoryId: categoryId as Id<"coreCategories">,
@@ -137,11 +137,10 @@ export function PlaylistForm({
         }
       } else {
         // Create new playlist
-        const newPlaylistId = await createPlaylist({
+        const newPlaylistId = await createCorePlaylist({
           title,
           description,
           categoryId: categoryId as Id<"coreCategories">,
-          status,
           thumbnailStorageId: finalThumbnailStorageId
         })
         toast.success("Playlist created successfully!")

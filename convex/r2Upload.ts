@@ -1,45 +1,58 @@
-import { R2 } from "@convex-dev/r2"
 import { action, mutation, query } from "./_generated/server"
 import { v } from "convex/values"
 
-// Initialize the R2 client
-const r2 = new R2({
-  // It's best practice to store secrets like bucket names in environment variables
-  bucket: process.env.R2_BUCKET_NAME ?? "realigna-media-uploads",
-  // Optional: Set a max size for uploads (e.g., 50MB)
-  maxSize: 50 * 1024 * 1024,
-})
-
-// --- R2 UPLOAD FUNCTIONS ---
-// These two functions are required by the @convex-dev/r2/react hook
+// --- UPLOAD FUNCTIONS ---
+// Standard Convex file upload functions
 
 /**
- * Generates a pre-signed URL for uploading a file to R2.
- * This is the mutation the R2 hook will call to get a pre-signed URL.
+ * Generates a pre-signed URL for uploading a file to Convex storage.
  */
 export const generateUploadUrl = mutation({
   args: {
-    // The R2 hook can optionally pass a custom key
-    customKey: v.optional(v.string()),
+    // Optional custom filename
+    filename: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // The `r2.generateUploadUrl` method from the helper library does the hard work
-    return await r2.generateUploadUrl(ctx, { customKey: args.customKey })
+    // Generate upload URL using Convex's built-in storage
+    return await ctx.storage.generateUploadUrl()
   },
 })
 
 /**
- * An action to sync metadata after a file upload is complete.
- * This is the action the R2 hook will call after the upload is complete.
+ * Create a media record after file upload is complete.
  */
-export const syncMetadata = action({
+export const createMediaRecord = mutation({
   args: {
-    // The key is the unique identifier for the uploaded file
-    key: v.string(),
+    storageId: v.id("_storage"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    mediaType: v.union(v.literal("audio"), v.literal("video")),
+    duration: v.number(),
+    fileSize: v.optional(v.number()),
+    contentType: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // The `r2.syncMetadata` method links the upload to Convex's internal state
-    return await r2.syncMetadata(ctx, { key: args.key })
+    // Get user identity
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      throw new Error("Authentication required")
+    }
+
+    // Create media record
+    const mediaId = await ctx.db.insert("medias", {
+      title: args.title,
+      description: args.description,
+      mediaType: args.mediaType,
+      storageId: args.storageId,
+      duration: args.duration,
+      fileSize: args.fileSize,
+      contentType: args.contentType,
+      processingStatus: "completed",
+      uploadedBy: identity.subject as any, // Cast to Id<"users">
+      isPublic: false,
+    })
+
+    return { mediaId }
   },
 })
 
