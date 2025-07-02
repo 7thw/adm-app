@@ -1,7 +1,5 @@
 import type { NextConfig } from "next";
 
-import type { NextConfig } from "next";
-
 const nextConfig: NextConfig = {
   // Allow cross-origin requests from your custom domain during development
   allowedDevOrigins: [
@@ -9,6 +7,19 @@ const nextConfig: NextConfig = {
     'localhost:3100',
     '192.168.1.241:3100'
   ],
+  // Configure external image domains
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'via.placeholder.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.convex.cloud',
+      },
+    ],
+  },
   experimental: {
     // Enable server actions if needed
     serverActions: {

@@ -23,13 +23,84 @@ async function requireAdminAccess(ctx: QueryCtx | MutationCtx): Promise<{ userId
 }
 
 // =================================================================
+// ADMIN USER INITIALIZATION
+// =================================================================
+
+// Initialize admin user profile for authenticated Clerk user
+export const initializeAdminUser = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
+
+    // Check if user already exists in users table
+    let userRecord = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", userId))
+      .unique();
+
+    // Create user record if it doesn't exist
+    if (!userRecord) {
+      const userRecordId = await ctx.db.insert("users", {
+        tokenIdentifier: userId
+      });
+      
+      userRecord = await ctx.db.get(userRecordId);
+      if (!userRecord) {
+        throw new Error("Failed to create user record");
+      }
+    }
+
+    // Check if admin profile already exists
+    const existingProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", userRecord._id))
+      .unique();
+
+    if (existingProfile) {
+      // Update existing profile to admin if not already
+      if (existingProfile.role !== "admin") {
+        await ctx.db.patch(existingProfile._id, {
+          role: "admin",
+          subscriptionStatus: "active",
+          lastActiveAt: Date.now()
+        });
+        return { message: "Updated existing profile to admin", profileId: existingProfile._id };
+      }
+      return { message: "Admin profile already exists", profileId: existingProfile._id };
+    }
+
+    // Create new admin profile
+    const adminProfileId = await ctx.db.insert("userProfiles", {
+      userId: userRecord._id,
+      clerkUserId: userId,
+      email: "adm-realigna@7thw.com",
+      firstName: "Admin",
+      lastName: "User",
+      imageUrl: "",
+      role: "admin",
+      subscriptionStatus: "active",
+      lastActiveAt: Date.now(),
+      isActive: true
+    });
+
+    return { message: "Admin profile created successfully", profileId: adminProfileId };
+  }
+});
+
+// =================================================================
 // CORE CATEGORIES MANAGEMENT
 // =================================================================
 
 export const listCoreCategories = query({
   args: { includeInactive: v.optional(v.boolean()) },
   handler: async (ctx, args): Promise<Doc<"coreCategories">[]> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     if (!args.includeInactive) {
       return await ctx.db
@@ -52,7 +123,28 @@ export const createCoreCategory = mutation({
     iconUrl: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<Id<"coreCategories">> => {
-    const { userId } = await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
+
+    // Check if user already exists in users table
+    let userRecord = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", userId))
+      .unique();
+
+    // Create user record if it doesn't exist
+    if (!userRecord) {
+      const userRecordId = await ctx.db.insert("users", {
+        tokenIdentifier: userId
+      });
+      
+      userRecord = await ctx.db.get(userRecordId);
+      if (!userRecord) {
+        throw new Error("Failed to create user record");
+      }
+    }
 
     // Check if slug already exists
     const existing = await ctx.db
@@ -77,7 +169,7 @@ export const createCoreCategory = mutation({
       ...args,
       isActive: true,
       order: nextOrder,
-      createdBy: userId,
+      createdBy: userRecord._id,
     });
   },
 });
@@ -93,7 +185,10 @@ export const addMediaTag = mutation({
     tag: v.string(),
   },
   handler: async (ctx, args): Promise<{ success: boolean; tagId: Id<"mediaTags"> }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate media exists
     const media = await ctx.db.get(args.coreMediaId);
@@ -128,7 +223,10 @@ export const removeMediaTag = mutation({
     tag: v.string(),
   },
   handler: async (ctx, args): Promise<{ success: boolean; message?: string }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Find the tag
     const tag = await ctx.db
@@ -152,7 +250,10 @@ export const getMediaTags = query({
     coreMediaId: v.id("medias"),
   },
   handler: async (ctx, args): Promise<string[]> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate media exists
     const media = await ctx.db.get(args.coreMediaId);
@@ -177,7 +278,10 @@ export const searchMediaByTags = query({
     matchAll: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<(Doc<"medias"> & { url?: string; thumbnailUrl?: string })[]> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     if (args.tags.length === 0) {
       return [];
@@ -268,7 +372,10 @@ export const listMedias = query({
     publicOnly: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     let medias;
 
@@ -321,7 +428,10 @@ export const createMedia = mutation({
     isPublic: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<Id<"medias">> => {
-    const { userId } = await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate that either storageId or embedUrl is provided
     if (!args.storageId && !args.embedUrl) {
@@ -352,7 +462,10 @@ export const updateMedia = mutation({
     waveformData: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ success: boolean }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate media exists
     const media = await ctx.db.get(args.coreMediaId);
@@ -375,7 +488,10 @@ export const deleteMedia = mutation({
     coreMediaId: v.id("medias"),
   },
   handler: async (ctx, args): Promise<{ success: boolean }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate media exists
     const media = await ctx.db.get(args.coreMediaId);
@@ -445,7 +561,10 @@ export const updateMediaMetadata = mutation({
     thumbnailUrl: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ success: boolean }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate media exists
     const media = await ctx.db.get(args.coreMediaId);
@@ -487,7 +606,10 @@ export const updateMediaMetadata = mutation({
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx): Promise<string> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Generate a secure upload URL using Convex's built-in storage
     return await ctx.storage.generateUploadUrl();
@@ -504,7 +626,10 @@ export const listCorePlaylists = query({
     categoryId: v.optional(v.id("coreCategories")),
   },
   handler: async (ctx, args): Promise<Doc<"corePlaylists">[]> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     if (args.categoryId && args.status) {
       return await ctx.db
@@ -540,13 +665,34 @@ export const createCorePlaylist = mutation({
     thumbnailStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args): Promise<Id<"corePlaylists">> => {
-    const { userId } = await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
+
+    // Check if user already exists in users table
+    let userRecord = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", userId))
+      .unique();
+
+    // Create user record if it doesn't exist
+    if (!userRecord) {
+      const userRecordId = await ctx.db.insert("users", {
+        tokenIdentifier: userId
+      });
+      
+      userRecord = await ctx.db.get(userRecordId);
+      if (!userRecord) {
+        throw new Error("Failed to create user record");
+      }
+    }
 
     return await ctx.db.insert("corePlaylists", {
       ...args,
       status: "draft",
       playCount: 0,
-      createdBy: userId,
+      createdBy: userRecord._id,
       lastModifiedAt: Date.now(),
     });
   },
@@ -562,7 +708,10 @@ export const updateCorePlaylist = mutation({
     thumbnailStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args): Promise<{ success: boolean }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     const playlist = await ctx.db.get(args.corePlaylistId);
     if (!playlist) {
@@ -593,7 +742,10 @@ export const updateCorePlaylist = mutation({
 export const publishCorePlaylist = mutation({
   args: { corePlaylistId: v.id("corePlaylists") },
   handler: async (ctx, args): Promise<{ success: boolean }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     const playlist = await ctx.db.get(args.corePlaylistId);
     if (!playlist) {
@@ -639,7 +791,10 @@ export const createCoreSection = mutation({
     isRequired: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<Id<"coreSections">> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate core playlist exists and is in draft status
     const playlist = await ctx.db.get(args.corePlaylistId);
@@ -675,7 +830,10 @@ export const addMediaToCoreSection = mutation({
     defaultSelected: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<{ success: boolean; sectionMediaId: Id<"sectionMedias"> }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate section exists and playlist is in draft
     const section = await ctx.db.get(args.coreSectionId);
@@ -725,7 +883,10 @@ export const listCoreSections = query({
     corePlaylistId: v.optional(v.id("corePlaylists")),
   },
   handler: async (ctx, args): Promise<Doc<"coreSections">[]> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     if (args.corePlaylistId) {
       return await ctx.db
@@ -752,7 +913,10 @@ export const updateCoreSection = mutation({
     isRequired: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<{ success: boolean }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate section exists
     const section = await ctx.db.get(args.coreSectionId);
@@ -787,7 +951,10 @@ export const deleteCoreSection = mutation({
     coreSectionId: v.id("coreSections"),
   },
   handler: async (ctx, args): Promise<{ success: boolean }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate section exists
     const section = await ctx.db.get(args.coreSectionId);
@@ -841,7 +1008,10 @@ export const reorderCoreSections = mutation({
     ),
   },
   handler: async (ctx, args): Promise<{ success: boolean }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     if (args.sectionOrders.length === 0) {
       return { success: true };
@@ -878,7 +1048,10 @@ export const deleteCorePlaylist = mutation({
     corePlaylistId: v.id("corePlaylists"),
   },
   handler: async (ctx, args): Promise<{ success: boolean }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate playlist exists
     const playlist = await ctx.db.get(args.corePlaylistId);
@@ -932,7 +1105,10 @@ export const duplicateCorePlaylist = mutation({
     copyToCategory: v.optional(v.id("coreCategories"))
   },
   handler: async (ctx, args): Promise<Id<"corePlaylists">> => {
-    const { userId } = await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Get source playlist
     const sourcePlaylist = await ctx.db.get(args.sourcePlaylistId);
@@ -1004,7 +1180,10 @@ export const updateCorePlaylistThumbnail = mutation({
     thumbnailStorageId: v.optional(v.id("_storage"))
   },
   handler: async (ctx, args): Promise<{ success: boolean }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     const playlist = await ctx.db.get(args.corePlaylistId);
     if (!playlist) {
@@ -1035,7 +1214,10 @@ export const addMediasToCoreSectionBatch = mutation({
     startOrder: v.optional(v.number())
   },
   handler: async (ctx, args): Promise<{ success: boolean; addedCount: number; skippedCount: number; }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate section exists and playlist is in draft
     const section = await ctx.db.get(args.coreSectionId);
@@ -1096,7 +1278,10 @@ export const removeMediasFromCoreSection = mutation({
     coreMediaIds: v.array(v.id("medias"))
   },
   handler: async (ctx, args): Promise<{ success: boolean; removedCount: number; }> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     // Validate section exists and playlist is in draft
     const section = await ctx.db.get(args.coreSectionId);
@@ -1136,7 +1321,10 @@ export const getPlaylistPreview = query({
     corePlaylistId: v.id("corePlaylists")
   },
   handler: async (ctx, args): Promise<any> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     const playlist = await ctx.db.get(args.corePlaylistId);
     if (!playlist) {
@@ -1190,7 +1378,10 @@ export const getCorePlaylistStats = query({
     corePlaylistId: v.id("corePlaylists")
   },
   handler: async (ctx, args): Promise<any> => {
-    await requireAdminAccess(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
     const playlist = await ctx.db.get(args.corePlaylistId);
     if (!playlist) {

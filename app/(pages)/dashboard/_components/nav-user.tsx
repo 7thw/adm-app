@@ -1,6 +1,6 @@
 "use client"
 
-import { PopoverTrigger } from "@/components/ui/popover"
+
 
 import {
   IconCreditCard,
@@ -86,14 +86,10 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <PopoverTrigger data-slot="user-profile" >
-                <DropdownMenuItem>
-
-                  <IconUserCircle />
-                  Profile
-
-                </DropdownMenuItem>
-              </PopoverTrigger>
+              <DropdownMenuItem>
+                <IconUserCircle />
+                Profile
+              </DropdownMenuItem>
               <DropdownMenuItem>
                 <IconCreditCard />
                 Billing

@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from "convex/react"
 import { SaveIcon, Upload, X } from "lucide-react"
 import Image from "next/image"
-import { useState, useRef } from "react"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -12,9 +12,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { cn } from "@/lib/utils"
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
+import { cn } from "@/lib/utils"
 
 interface CorePlaylistFormProps {
   initialData?: {
@@ -221,8 +221,8 @@ export default function CorePlaylistForm({
                   <Image
                     src={thumbnailPreview}
                     alt="Thumbnail preview"
-                    width={128}
-                    height={128}
+                    width={400}
+                    height={200}
                     className="w-full h-full object-cover"
                   />
                   <Button

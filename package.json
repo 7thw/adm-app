@@ -15,6 +15,7 @@
     "stopconvex": "pkill -f 'convex.*'||true"
   },
   "dependencies": {
+    "@clerk/clerk-sdk-node": "^5.0.1",
     "@clerk/mcp-tools": "^0.1.1",
     "@clerk/nextjs": "^6.23.1",
     "@convex-dev/auth": "^0.0.80",
@@ -48,12 +49,12 @@
     "@tabler/icons-react": "^3.34.0",
     "@tanstack/react-table": "^8.21.3",
     "@vercel/mcp-adapter": "^0.11.1",
-    "@clerk/clerk-sdk-node": "^5.0.1",
-    "svix": "^1.24.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.25.0",
     "convex-helpers": "^0.1.95",
+    "emblor": "^1.4.8",
+    "framer-motion": "^12.22.0",
     "lucide-react": "^0.518.0",
     "motion": "^12.19.2",
     "next": "15.3.4",
@@ -64,6 +65,7 @@
     "react-hook-form": "^7.59.0",
     "recharts": "^2.15.4",
     "sonner": "^2.0.5",
+    "svix": "^1.24.0",
     "tailwind-merge": "^3.3.1",
     "vaul": "^1.1.2"
   },

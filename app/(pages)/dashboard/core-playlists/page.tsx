@@ -1,21 +1,22 @@
 "use client";
 
-import { api } from "@/convex/_generated/api";
-import { Doc, Id } from "@/convex/_generated/dataModel";
-import { useQuery, useMutation } from "convex/react";
-import { Copy, Edit, Link, List, Loader2, PlusCircle, Search } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { toast } from "sonner";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { api } from "@/convex/_generated/api";
+import { Doc, Id } from "@/convex/_generated/dataModel";
+import { useMutation, useQuery } from "convex/react";
+import { Copy, Edit, Link, List, Loader2, PlusCircle, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+import { CreateCorePlaylistSheet } from "./_components/create-core-playlist-sheet";
 
 export default function CorePlaylistsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Fetch core playlists from Convex with proper typing
   const corePlaylists = useQuery(api.admin.listCorePlaylists, {}) || [];
@@ -45,9 +46,9 @@ export default function CorePlaylistsPage() {
     return titleMatch || descriptionMatch || categoryMatch;
   });
 
-  // Handler for creating new core playlist
+  // Handler for opening create modal
   const handleCreateCorePlaylist = () => {
-    router.push("/dashboard/core-playlists/new");
+    setIsCreateModalOpen(true);
   };
 
   // Handler for duplicating core playlist
@@ -59,7 +60,7 @@ export default function CorePlaylistsPage() {
         newTitle,
         keepSections: true, // Include sections in the duplicate
       });
-      
+
       toast.success(`Core playlist duplicated successfully!`);
       router.push(`/dashboard/core-playlists/${newCorePlaylistId}/edit`);
     } catch (error) {
@@ -176,6 +177,15 @@ export default function CorePlaylistsPage() {
           </p>
         </div>
       )}
+
+      <CreateCorePlaylistSheet
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={(corePlaylistId) => {
+          setIsCreateModalOpen(false);
+          toast.success("Core Playlist created successfully!");
+        }}
+      />
     </div>
   );
 }

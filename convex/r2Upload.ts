@@ -52,6 +52,24 @@ export const createCoreMediaRecord = mutation({
       throw new Error("Authentication required")
     }
 
+    // Ensure user record exists in users table
+    let userRecord = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.subject))
+      .unique()
+
+    // Create user record if it doesn't exist
+    if (!userRecord) {
+      const userRecordId = await ctx.db.insert("users", {
+        tokenIdentifier: identity.subject
+      })
+      userRecord = await ctx.db.get(userRecordId)
+    }
+
+    if (!userRecord) {
+      throw new Error("Failed to create or retrieve user record")
+    }
+
     // Create core media record with R2 data
     // Note: We store only the r2Key, not r2Url (which would expire)
     // Signed URLs should be generated dynamically when media is accessed
@@ -64,7 +82,7 @@ export const createCoreMediaRecord = mutation({
       fileSize: args.fileSize,
       contentType: args.contentType,
       processingStatus: "completed",
-      uploadedBy: identity.subject as any, // Cast to Id<"users">
+      uploadedBy: userRecord._id, // Use proper Convex user ID
       isPublic: false,
     })
 
