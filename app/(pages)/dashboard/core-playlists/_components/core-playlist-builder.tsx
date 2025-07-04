@@ -80,7 +80,7 @@ export function CorePlaylistBuilder({
       coreMediaType: item.sectionType,
       order: index + 1,
     }))
-    
+
     onUpdateCoreMediaItems(coreSectionId, coreMediaItems)
   }
 
@@ -118,8 +118,13 @@ export function CorePlaylistBuilder({
 
       {/* Draggable Core Sections */}
       <DraggableContainer
-        items={coreSections}
-        onReorder={handleCoreSectionReorder}
+        items={coreSections.map(section => ({ id: section.coreSectionId }))}
+        onReorder={(items) => {
+          const reorderedSections = items
+            .map(item => coreSections.find(section => section.coreSectionId === item.id))
+            .filter((section): section is CoreSection => section !== undefined);
+          handleCoreSectionReorder(reorderedSections);
+        }}
         className="space-y-6"
       >
         {coreSections.map((coreSection) => (
@@ -173,9 +178,6 @@ export function CorePlaylistBuilder({
                 <div className="rounded-md border">
                   <DataTable
                     data={convertToDataTableItems(coreSection.coreMediaItems)}
-                    onReorder={(reorderedItems) => 
-                      handleCoreMediaReorder(coreSection.coreSectionId, reorderedItems)
-                    }
                   />
                 </div>
                 {coreSection.coreMediaItems.length === 0 && (
@@ -208,7 +210,7 @@ export function CorePlaylistBuilder({
             </div>
             <h3 className="text-lg font-medium mb-2">No Core Sections yet</h3>
             <p className="text-muted-foreground mb-6 max-w-sm">
-              Core Sections organize your media content. Each section can contain multiple media items 
+              Core Sections organize your media content. Each section can contain multiple media items
               that subscribers will experience in sequence.
             </p>
             <Button onClick={onAddCoreSection}>

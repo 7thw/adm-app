@@ -20,10 +20,9 @@ export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
   const router = useRouter()
   const corePlaylistId = params.corePlaylistId as Id<"corePlaylists">
 
-  // Fetch Core Playlist data
-  const corePlaylist = useQuery(api.admin.getCorePlaylist, { 
-    corePlaylistId 
-  })
+  // Fetch all playlists from Convex and filter client-side for the specific playlist
+  const playlists = useQuery(api.admin.listCorePlaylists, {}) || []
+  const corePlaylist = playlists.find((p) => p._id === corePlaylistId)
 
   // Mock data for Core Sections (until we have the actual Convex queries)
   const mockCoreSections = [

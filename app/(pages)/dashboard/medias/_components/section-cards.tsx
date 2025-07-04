@@ -1,5 +1,4 @@
 import { api } from "@/convex/_generated/api";
-import { useUser } from "@clerk/nextjs";
 import { IconMusic, IconVideo } from "@tabler/icons-react";
 import { useQuery } from "convex/react";
 
@@ -12,10 +11,8 @@ import {
 } from "@/components/ui/card";
 
 export function SectionCards() {
-  const { isSignedIn } = useUser()
-
   // Get media data using admin API
-  const mediaData = useQuery(api.admin.listMedias, isSignedIn ? {} : "skip");
+  const mediaData = useQuery(api.admin.listCoreMedias, {});
 
   // Calculate counts - mediaData is now a simple array
   const audioCount = mediaData?.filter(media => media.mediaType === 'audio').length || 0;

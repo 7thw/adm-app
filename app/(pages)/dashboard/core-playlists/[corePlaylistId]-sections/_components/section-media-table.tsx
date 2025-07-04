@@ -28,6 +28,28 @@ import {
   TableRow
 } from "@/components/ui/table"
 import { Doc } from "@/convex/_generated/dataModel"
+import {DraggableContainer} from "@/components/dnd/draggable-container";
+import {Checkbox} from "@/components/ui/checkbox";
+import {Loader2} from "lucide-react";
+import {useRouter} from "next/navigation";
+interface CorePlaylistPageProps {
+  params: {
+    corePlaylistId: string
+  }
+}
+export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
+  const router = useRouter()
+  // Fetch all playlists from Convex and filter client-side for the specific playlist
+  const playlists = useQuery(api.admin.listCorePlaylists, {}) || []
+  const corePlaylist = playlists.find((p) => p._id === params.corePlaylistId)
+  if (!corePlaylist) {
+    return (
+      <div className="text-center p-4 border rounded-md bg-muted/10">
+        <p className="text-muted-foreground">Loading playlist...</p>
+      </div>
+    )
+  }
+}
 
 // Use Convex-generated types as source of truth
 type MediaDetails = Doc<"medias">
@@ -146,12 +168,12 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
   )
 
   // Fetch section media from Convex
-  const sectionMediaResult = useQuery(api.admin.getSectionMedia, {
-    sectionId
+  const sectionMediaResult = useQuery(api.admin.listSectionMedia, { coreSectionId: sectionId
+
   }) as SectionMediaRaw[] || []
 
   // Fetch all media using admin API
-  const allMedia = useQuery(api.admin.listMedias, { mediaType: undefined }) || []
+  const allMedia = useQuery(api.admin.listCoreMedias, { mediaType: undefined }) || []
 
   // Transform raw data into SectionMediaItem format
   const sectionMedias = sectionMediaResult.map(item => {
@@ -205,7 +227,8 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
 
       // Save the new order to the database
       reorderMedia({
-        mediaOrders
+        coreSectionId: sectionId,
+        reorderedItems: mediaOrders
       })
     }
   }
@@ -219,8 +242,11 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
         return
       }
 
-      // Update selection in Convex - use isRequired instead of selectMedia
-      await updateSelection({ id, isRequired: selected })
+      // Update selection in Convex
+      await updateSelection({ 
+        sectionMediaId: id, 
+        defaultSelected: selected 
+      })
 
       // Update local state
       setSelectedCount(prev => selected ? prev + 1 : prev - 1)
@@ -237,7 +263,7 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
       const item = sortedMedia.find(item => item._id === id)
       const wasSelected = item?.selectMedia || false
 
-      await removeMedia({ id })
+      await removeMedia({ sectionMediaId: id })
 
       // Update the selected count if needed
       if (wasSelected) {
@@ -284,8 +310,8 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
       }).filter(Boolean) as Id<"medias">[]
 
       await batchRemoveMedias({
-        sectionId,
-        mediaIds
+        coreSectionId: sectionId,
+        coreMediaIds: mediaIds
       })
 
       toast.success(`Removed ${batchSelectedIds.size} media items`)
@@ -301,8 +327,8 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
 
     try {
       const result = await batchAddMedias({
-        sectionId,
-        mediaIds: selectedMediaIds
+        coreSectionId: sectionId,
+        coreMediaIds: selectedMediaIds
       })
 
       toast.success(`Added ${result.addedCount} media items` +
@@ -384,7 +410,7 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
                     onClick={handleBatchSelectAll}
                     className="gap-1"
                   >
-                    <Select className="h-3 w-3" />
+                    <Select />
                     Select All
                   </Button>
                 ) : (

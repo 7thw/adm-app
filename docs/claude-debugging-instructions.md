@@ -9,6 +9,8 @@ description: Comprehensive debugging instructions for Claude to efficiently trou
 - **Admin App**: Content management for creating Core Playlists (Next.js + Convex + Clerk)
 - **PWA App**: User-facing app for consuming content as User Playlists (React + Convex + Clerk)
 
+<!-- test -->
+
 ## Critical Architecture Rules
 
 ### 1. ULTRA-STRICT NAMING CONVENTION

@@ -1,0 +1,78 @@
+{
+  "function_parameters": {
+    "sectionId": "coreSectionId",
+    "mediaId": "coreMediaId", 
+    "playlistId": "corePlaylistId",
+    "sourcePlaylistId": "sourceCorePlaylistId",
+    "newPlaylistId": "newCorePlaylistId",
+    "selectedMediaIds": "selectedCoreMediaIds",
+    "mediaIds": "coreMediaIds"
+  },
+  "variable_names": {
+    "sectionId": "coreSectionId",
+    "mediaId": "coreMediaId",
+    "playlistId": "corePlaylistId",
+    "newPlaylistId": "newCorePlaylistId",
+    "selectedMediaIds": "selectedCoreMediaIds",
+    "mediaIds": "coreMediaIds"
+  },
+  "object_properties": {
+    "sectionId": "coreSectionId",
+    "mediaId": "coreMediaId",
+    "playlistId": "corePlaylistId",
+    "item.mediaId": "item.coreMediaId",
+    "sm.mediaId": "sm.coreMediaId",
+    "row.original.playlistId": "row.original.corePlaylistId"
+  },
+  "ui_text_labels": {
+    "Playlists": "Core Playlists",
+    "Create Playlist": "Create Core Playlist",
+    "Edit Playlist": "Edit Core Playlist",
+    "Save Playlist": "Save Core Playlist",
+    "Delete Playlist": "Delete Core Playlist",
+    "Duplicate Playlist": "Duplicate Core Playlist",
+    "Loading playlists": "Loading core playlists",
+    "Search playlists": "Search core playlists",
+    "No playlists found": "No core playlists found",
+    "No matching playlists found": "No matching core playlists found",
+    "master playlists": "master core playlists",
+    "new playlist": "new core playlist",
+    "playlist duplicated": "core playlist duplicated",
+    "duplicate playlist": "duplicate core playlist"
+  },
+  "comments_and_descriptions": {
+    "// Fetch core playlists": "// Fetch core playlists",
+    "// Mutations for playlist operations": "// Mutations for core playlist operations", 
+    "// Filter playlists based on search query": "// Filter core playlists based on search query",
+    "// Handler for creating new playlist": "// Handler for creating new core playlist",
+    "// Handler for duplicating playlist": "// Handler for duplicating core playlist",
+    "playlist sections": "core playlist sections",
+    "reviewer -> playlistId": "reviewer -> corePlaylistId"
+  },
+  "type_definitions": {
+    "PlaylistSection": "CorePlaylistSection",
+    "PlaylistFormProps": "CorePlaylistFormProps",
+    "onSuccess?: (playlistId": "onSuccess?: (corePlaylistId"
+  },
+  "api_calls": {
+    "api.admin.listCorePlaylists": "api.admin.listCorePlaylists",
+    "api.admin.duplicateCorePlaylist": "api.admin.duplicateCorePlaylist",
+    "api.admin.createCorePlaylist": "api.admin.createCorePlaylist",
+    "api.admin.updateCorePlaylist": "api.admin.updateCorePlaylist",
+    "api.admin.deleteCorePlaylist": "api.admin.deleteCorePlaylist"
+  },
+  "url_paths": {
+    "/dashboard/core-playlists": "/dashboard/core-playlists",
+    "core-playlists/new": "core-playlists/new",
+    "core-playlists/${playlistId}": "core-playlists/${corePlaylistId}",
+    "core-playlists/${newPlaylistId}": "core-playlists/${newCorePlaylistId}"
+  },
+  "css_classes_and_keys": {
+    "accessorKey: \"playlistId\"": "accessorKey: \"corePlaylistId\"",
+    "defaultValue={item.playlistId}": "defaultValue={item.corePlaylistId}"
+  },
+  "database_field_references": {
+    "section.playlistId": "section.corePlaylistId",
+    "section.corePlaylistId": "section.corePlaylistId"
+  }
+}

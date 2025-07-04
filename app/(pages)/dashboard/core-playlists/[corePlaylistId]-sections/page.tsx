@@ -8,7 +8,7 @@ import { ArrowLeftIcon, CheckCircle2Icon, LoaderIcon, PlusIcon } from "lucide-re
 import { notFound, useRouter } from "next/navigation"
 import React from "react"
 
-import { DataTable } from "@/app/(pages)/dashboard/core-playlists/[id]/_components/data-table"
+import { DataTable } from "@/app/(pages)/dashboard/core-playlists/[corePlaylistId]-sections/_components/data-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,7 +19,7 @@ import AddSectionForm from "./_components/add-section-form"
 
 interface CorePlaylistPageProps {
   params: Promise<{
-    id: string
+    corePlaylistId: string
   }>
 }
 
@@ -145,8 +145,8 @@ export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
   const router = useRouter()
 
   // Use React.use() to unwrap the params promise in Next.js 14+
-  const unwrappedParams = React.use(params) as { id: string }
-  const id = unwrappedParams.id
+  const unwrappedParams = React.use(params) as { corePlaylistId: string }
+  const corePlaylistId = unwrappedParams.corePlaylistId
 
   // Fetch all playlists from Convex and filter client-side for the specific playlist
   const playlists = useQuery(api.admin.listCorePlaylists, {}) || []
@@ -154,13 +154,13 @@ export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
   // Get categories for display
   const categories = useQuery(api.admin.listCoreCategories, { includeInactive: true }) || []
   
-  // Check if id is valid
-  if (!id || !/^[\w\d]+$/.test(id)) {
+  // Check if corePlaylistId is valid
+  if (!corePlaylistId || !/^[\w\d]+$/.test(corePlaylistId)) {
     // If ID format is invalid, return 404
     return notFound()
   }
 
-  const playlist = playlists.find((p: Doc<"corePlaylists">) => p._id === id) as Doc<"corePlaylists"> | undefined
+  const playlist = playlists.find((p: Doc<"corePlaylists">) => p._id === corePlaylistId) as Doc<"corePlaylists"> | undefined
   
   // Since we don't have a direct query for sections by playlist ID, we'll use a temporary solution
   // In a production app, we should create a specific Convex query for this
@@ -225,7 +225,7 @@ export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
           </span>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push(`/dashboard/core-playlists/${id}/edit`)}>
+          <Button variant="outline" onClick={() => router.push(`/dashboard/core-playlists/${corePlaylistId}/edit`)}>
             Edit corePlaylist
           </Button>
           <Button variant="secondary">Preview</Button>

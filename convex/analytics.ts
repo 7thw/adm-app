@@ -23,18 +23,17 @@ export const trackInstallEvent = mutation({
       return;
     }
 
-    await ctx.db.insert('analyticsEvents', {
-      userId: identity.subject as any, // Cast to Id<"users">
-      eventType: args.event,
-      eventData: JSON.stringify({
-        platform: args.platform || 'unknown',
-        variant: args.variant || 'unknown',
-        context: args.context
-      }),
-      sessionId: args.sessionId || undefined,
-      deviceType: args.platform || undefined,
-      userAgent: args.userAgent || undefined,
-      timestamp: args.timestamp || Date.now()
+    await ctx.db.insert('installAnalytics', {
+      event: args.event,
+      platform: args.platform || 'unknown',
+      variant: args.variant || 'unknown',
+      context: args.context,
+      userAgent: args.userAgent,
+      timestamp: args.timestamp || Date.now(),
+      sessionId: args.sessionId,
+      userId: identity.subject,
+      userEmail: identity.email,
+      createdAt: Date.now()
     })
   }
 })

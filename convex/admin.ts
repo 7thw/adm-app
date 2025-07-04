@@ -3,12 +3,84 @@ import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { mutation, MutationCtx, query, QueryCtx } from "./_generated/server";
 
-// Helper function to check admin access
-async function requireAdminAccess(ctx: QueryCtx | MutationCtx): Promise<{ userId: Id<"users">; profile: Doc<"userProfiles"> }> {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) {
-    throw new Error("Authentication required");
-  }
+
+
+// =================================================================
+// ADMIN USER MANAGEMENT
+// =================================================================
+
+  // Initialize admin user profile for authenticated Clerk user
+  export const initializeAdminUser = mutation({
+    args: {},
+    handler: async (ctx) => {
+      const userId = await getAuthUserId(ctx);
+      if (!userId) {
+        throw new Error("Authentication required");
+      }
+
+      // Check if user already exists in users table
+      let userRecord = await ctx.db
+        .query("users")
+        .withIndex("by_token", (q) => q.eq("tokenIdentifier", userId))
+        .unique();
+
+      // Create user record if it doesn't exist
+      if (!userRecord) {
+        const userRecordId = await ctx.db.insert("users", {
+          tokenIdentifier: userId
+        });
+
+
+        
+        userRecord = await ctx.db.get(userRecordId);
+        if (!userRecord) {
+          throw new Error("Failed to create user record");
+        }
+      }
+
+      // Check if admin profile already exists
+      const existingProfile = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_user", (q) => q.eq("userId", userRecord._id))
+        .unique();
+
+      if (existingProfile) {
+        // Update existing profile to admin if not already
+        if (existingProfile.role !== "admin") {
+          await ctx.db.patch(existingProfile._id, {
+            role: "admin",
+            subscriptionStatus: "active",
+            lastActiveAt: Date.now()
+          });
+          return { message: "Updated existing profile to admin", profileId: existingProfile._id };
+        }
+        return { message: "Admin profile already exists", profileId: existingProfile._id };
+      }
+
+      // Create new admin profile
+      const adminProfileId = await ctx.db.insert("userProfiles", {
+        userId: userRecord._id,
+        clerkUserId: userId,
+        email: "adm-realigna@7thw.com",
+        firstName: "Admin",
+        lastName: "User",
+        imageUrl: "",
+        role: "admin",
+        subscriptionStatus: "active",
+        lastActiveAt: Date.now(),
+        isActive: true
+      });
+
+      return { message: "Admin profile created successfully", profileId: adminProfileId };
+    }
+  });
+
+  // Helper function to check admin access
+  async function requireAdminAccess(ctx: QueryCtx | MutationCtx): Promise<{ userId: Id<"users">; profile: Doc<"userProfiles"> }> {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
 
   const profile = await ctx.db
     .query("userProfiles")
@@ -23,201 +95,133 @@ async function requireAdminAccess(ctx: QueryCtx | MutationCtx): Promise<{ userId
 }
 
 // =================================================================
-// ADMIN USER INITIALIZATION
-// =================================================================
-
-// Initialize admin user profile for authenticated Clerk user
-export const initializeAdminUser = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Authentication required");
-    }
-
-    // Check if user already exists in users table
-    let userRecord = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", userId))
-      .unique();
-
-    // Create user record if it doesn't exist
-    if (!userRecord) {
-      const userRecordId = await ctx.db.insert("users", {
-        tokenIdentifier: userId
-      });
-      
-      userRecord = await ctx.db.get(userRecordId);
-      if (!userRecord) {
-        throw new Error("Failed to create user record");
-      }
-    }
-
-    // Check if admin profile already exists
-    const existingProfile = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_user", (q) => q.eq("userId", userRecord._id))
-      .unique();
-
-    if (existingProfile) {
-      // Update existing profile to admin if not already
-      if (existingProfile.role !== "admin") {
-        await ctx.db.patch(existingProfile._id, {
-          role: "admin",
-          subscriptionStatus: "active",
-          lastActiveAt: Date.now()
-        });
-        return { message: "Updated existing profile to admin", profileId: existingProfile._id };
-      }
-      return { message: "Admin profile already exists", profileId: existingProfile._id };
-    }
-
-    // Create new admin profile
-    const adminProfileId = await ctx.db.insert("userProfiles", {
-      userId: userRecord._id,
-      clerkUserId: userId,
-      email: "adm-realigna@7thw.com",
-      firstName: "Admin",
-      lastName: "User",
-      imageUrl: "",
-      role: "admin",
-      subscriptionStatus: "active",
-      lastActiveAt: Date.now(),
-      isActive: true
-    });
-
-    return { message: "Admin profile created successfully", profileId: adminProfileId };
-  }
-});
-
-// =================================================================
 // CORE CATEGORIES MANAGEMENT
 // =================================================================
 
-export const listCoreCategories = query({
-  args: { includeInactive: v.optional(v.boolean()) },
-  handler: async (ctx, args): Promise<Doc<"coreCategories">[]> => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Authentication required");
-    }
-
-    if (!args.includeInactive) {
-      return await ctx.db
-        .query("coreCategories")
-        .withIndex("by_active", (q) => q.eq("isActive", true))
-        .order("asc")
-        .collect();
-    }
-
-    return await ctx.db.query("coreCategories").order("asc").collect();
-  },
-});
-
-export const createCoreCategory = mutation({
-  args: {
-    name: v.string(),
-    description: v.optional(v.string()),
-    slug: v.string(),
-    color: v.optional(v.string()),
-    iconUrl: v.optional(v.string()),
-  },
-  handler: async (ctx, args): Promise<Id<"coreCategories">> => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Authentication required");
-    }
-
-    // Check if user already exists in users table
-    let userRecord = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", userId))
-      .unique();
-
-    // Create user record if it doesn't exist
-    if (!userRecord) {
-      const userRecordId = await ctx.db.insert("users", {
-        tokenIdentifier: userId
-      });
-      
-      userRecord = await ctx.db.get(userRecordId);
-      if (!userRecord) {
-        throw new Error("Failed to create user record");
+  export const listCoreCategories = query({
+    args: { includeInactive: v.optional(v.boolean()) },
+    handler: async (ctx, args): Promise<Doc<"coreCategories">[]> => {
+      const userId = await getAuthUserId(ctx);
+      if (!userId) {
+        throw new Error("Authentication required");
       }
-    }
 
-    // Check if slug already exists
-    const existing = await ctx.db
-      .query("coreCategories")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .unique();
+      if (!args.includeInactive) {
+        return await ctx.db
+          .query("coreCategories")
+          .withIndex("by_active", (q) => q.eq("isActive", true))
+          .order("asc")
+          .collect();
+      }
 
-    if (existing) {
-      throw new Error("Category with this slug already exists");
-    }
+      return await ctx.db.query("coreCategories").order("asc").collect();
+    },
+  });
 
-    // Get next order number
-    const categories = await ctx.db
-      .query("coreCategories")
-      .withIndex("by_order")
-      .order("desc")
-      .take(1);
+  export const createCoreCategory = mutation({
+    args: {
+      name: v.string(),
+      description: v.optional(v.string()),
+      slug: v.string(),
+      color: v.optional(v.string()),
+      iconUrl: v.optional(v.string()),
+    },
+    handler: async (ctx, args): Promise<Id<"coreCategories">> => {
+      const userId = await getAuthUserId(ctx);
+      if (!userId) {
+        throw new Error("Authentication required");
+      }
 
-    const nextOrder = categories.length > 0 ? categories[0].order + 1 : 1;
+      // Check if user already exists in users table
+      let userRecord = await ctx.db
+        .query("users")
+        .withIndex("by_token", (q) => q.eq("tokenIdentifier", userId))
+        .unique();
 
-    return await ctx.db.insert("coreCategories", {
-      ...args,
-      isActive: true,
-      order: nextOrder,
-      createdBy: userRecord._id,
-    });
-  },
-});
+      // Create user record if it doesn't exist
+      if (!userRecord) {
+        const userRecordId = await ctx.db.insert("users", {
+          tokenIdentifier: userId
+        });
+        
+        userRecord = await ctx.db.get(userRecordId);
+        if (!userRecord) {
+          throw new Error("Failed to create user record");
+        }
+      }
+
+      // Check if slug already exists
+      const existing = await ctx.db
+        .query("coreCategories")
+        .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+        .unique();
+
+      if (existing) {
+        throw new Error("Category with this slug already exists");
+      }
+
+      // Get next order number
+      const categories = await ctx.db
+        .query("coreCategories")
+        .withIndex("by_order")
+        .order("desc")
+        .take(1);
+
+      const nextOrder = categories.length > 0 ? categories[0].order + 1 : 1;
+
+      return await ctx.db.insert("coreCategories", {
+        ...args,
+        isActive: true,
+        order: nextOrder,
+        createdBy: userRecord._id,
+      });
+    },
+  });
 
 // =================================================================
-// MEDIA MANAGEMENT
+// MEDIAS MANAGEMENT
 // =================================================================
 
-// Media Tag Management
-export const addMediaTag = mutation({
-  args: {
-    coreMediaId: v.id("medias"),
-    tag: v.string(),
-  },
-  handler: async (ctx, args): Promise<{ success: boolean; tagId: Id<"mediaTags"> }> => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Authentication required");
-    }
+  // Media Tag Management
+  export const addCoreMediaTag = mutation({
+    args: {
+      coreMediaId: v.id("medias"),
+      tag: v.string(),
+    },
+    handler: async (ctx, args): Promise<{ success: boolean; tagId: Id<"mediaTags"> }> => {
+      const userId = await getAuthUserId(ctx);
+      if (!userId) {
+        throw new Error("Authentication required");
+      }
 
-    // Validate media exists
-    const media = await ctx.db.get(args.coreMediaId);
-    if (!media) {
-      throw new Error("Media not found");
-    }
+      // Validate media exists
+      const media = await ctx.db.get(args.coreMediaId);
+      if (!media) {
+        throw new Error("Media not found");
+      }
 
-    // Check if tag already exists for this media
-    const existingTag = await ctx.db
-      .query("mediaTags")
-      .withIndex("by_core_media_tag", (q) => q.eq("coreMediaId", args.coreMediaId).eq("tag", args.tag))
-      .unique();
+      // Check if tag already exists for this media
+      const existingTag = await ctx.db
+        .query("mediaTags")
+        .withIndex("by_core_media_tag", (q) => q.eq("coreMediaId", args.coreMediaId).eq("tag", args.tag))
+        .unique();
 
-    if (existingTag) {
-      return { success: true, tagId: existingTag._id };
-    }
+      if (existingTag) {
+        return { success: true, tagId: existingTag._id };
+      }
 
-    // Create new tag
-    const tagId = await ctx.db.insert("mediaTags", {
-      coreMediaId: args.coreMediaId,
-      tag: args.tag,
-      createdAt: Date.now(),
-    });
+      // Create new tag
+      const tagId = await ctx.db.insert("mediaTags", {
+        coreMediaId: args.coreMediaId,
+        tag: args.tag,
+        createdAt: Date.now(),
+      });
 
-    return { success: true, tagId };
-  },
-});
+      return { success: true, tagId };
+    },
+  });
 
-export const removeMediaTag = mutation({
+export const removeCoreMediaTag = mutation({
   args: {
     coreMediaId: v.id("medias"),
     tag: v.string(),
@@ -245,7 +249,7 @@ export const removeMediaTag = mutation({
   },
 });
 
-export const getMediaTags = query({
+export const getCoreMediaTags = query({
   args: {
     coreMediaId: v.id("medias"),
   },
@@ -271,7 +275,7 @@ export const getMediaTags = query({
   },
 });
 
-export const searchMediaByTags = query({
+export const searchCoreMediaByTags = query({
   args: {
     tags: v.array(v.string()),
     mediaType: v.optional(v.union(v.literal("audio"), v.literal("video"))),
@@ -366,7 +370,7 @@ export const searchMediaByTags = query({
   },
 });
 
-export const listMedias = query({
+export const listCoreMedias = query({
   args: {
     mediaType: v.optional(v.union(v.literal("audio"), v.literal("video"))),
     publicOnly: v.optional(v.boolean()),
@@ -403,10 +407,14 @@ export const listMedias = query({
       medias = await ctx.db.query("medias").order("desc").collect();
     }
 
-    // Get signed URLs for storage files
+    // Get signed URLs for storage files and apply default values
     return await Promise.all(
       medias.map(async (media) => ({
         ...media,
+        title: media.title || "",
+        mediaType: media.mediaType || "audio",
+        duration: media.duration || 0,
+        processingStatus: media.processingStatus || "completed",
         url: media.storageId ? (await ctx.storage.getUrl(media.storageId)) ?? undefined : media.embedUrl,
         thumbnailUrl: media.thumbnailStorageId
           ? (await ctx.storage.getUrl(media.thumbnailStorageId)) ?? undefined
@@ -416,7 +424,7 @@ export const listMedias = query({
   },
 });
 
-export const createMedia = mutation({
+export const createCoreMedia = mutation({
   args: {
     title: v.string(),
     description: v.optional(v.string()),
@@ -447,7 +455,7 @@ export const createMedia = mutation({
   },
 });
 
-export const updateMedia = mutation({
+export const updateCoreMedia = mutation({
   args: {
     coreMediaId: v.id("medias"),
     title: v.optional(v.string()),
@@ -483,7 +491,7 @@ export const updateMedia = mutation({
   },
 });
 
-export const deleteMedia = mutation({
+export const deleteCoreMedia = mutation({
   args: {
     coreMediaId: v.id("medias"),
   },
@@ -536,7 +544,7 @@ export const deleteMedia = mutation({
   },
 });
 
-export const updateMediaMetadata = mutation({
+export const updateCoreMediaMetadata = mutation({
   args: {
     coreMediaId: v.id("medias"),
     // Processing metadata
@@ -777,7 +785,7 @@ export const publishCorePlaylist = mutation({
 });
 
 // =================================================================
-// SECTIONS MANAGEMENT
+// CORE SECTIONS
 // =================================================================
 
 export const createCoreSection = mutation({
@@ -1378,10 +1386,7 @@ export const getCorePlaylistStats = query({
     corePlaylistId: v.id("corePlaylists")
   },
   handler: async (ctx, args): Promise<any> => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Authentication required");
-    }
+    // Authentication removed - open access
 
     const playlist = await ctx.db.get(args.corePlaylistId);
     if (!playlist) {
@@ -1418,6 +1423,267 @@ export const getCorePlaylistStats = query({
       averageRating: playlist.averageRating,
       status: playlist.status,
       createdAt: playlist.lastModifiedAt // Using lastModifiedAt as creation timestamp
+    };
+  },
+});
+
+// =================================================================
+// SECTION MEDIA MANAGEMENT (Frontend-compatible functions)
+// =================================================================
+
+// List section media with details
+export const listSectionMedia = query({
+  args: {
+    coreSectionId: v.id("coreSections")
+  },
+  handler: async (ctx, args): Promise<any[]> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
+
+    // Validate section exists
+    const section = await ctx.db.get(args.coreSectionId);
+    if (!section) {
+      throw new Error("Section not found");
+    }
+
+    // Get section medias with order
+    const sectionMedias = await ctx.db
+      .query("sectionMedias")
+      .withIndex("by_core_section_order", (q) => q.eq("coreSectionId", args.coreSectionId))
+      .collect();
+
+    // Get media details for each section media
+    const mediasWithDetails = await Promise.all(
+      sectionMedias.map(async (sm) => {
+        const media = await ctx.db.get(sm.coreMediaId);
+        return {
+          ...sm,
+          media
+        };
+      })
+    );
+
+    return mediasWithDetails;
+  },
+});
+
+// Update section media selection state
+export const updateSectionMediaSelection = mutation({
+  args: {
+    sectionMediaId: v.id("sectionMedias"),
+    defaultSelected: v.boolean()
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
+
+    // Get section media
+    const sectionMedia = await ctx.db.get(args.sectionMediaId);
+    if (!sectionMedia) {
+      throw new Error("Section media not found");
+    }
+
+    // Validate section exists and playlist is in draft
+    const section = await ctx.db.get(sectionMedia.coreSectionId);
+    if (!section) {
+      throw new Error("Section not found");
+    }
+
+    const playlist = await ctx.db.get(section.corePlaylistId);
+    if (!playlist || playlist.status === "published") {
+      throw new Error("Cannot modify published core playlist");
+    }
+
+    // Update selection state
+    await ctx.db.patch(args.sectionMediaId, {
+      defaultSelected: args.defaultSelected
+    });
+
+    return { success: true };
+  },
+});
+
+// Reorder section media
+export const reorderSectionMedia = mutation({
+  args: {
+    coreSectionId: v.id("coreSections"),
+    reorderedItems: v.array(v.object({
+      id: v.id("sectionMedias"),
+      order: v.number()
+    }))
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
+
+    // Validate section exists and playlist is in draft
+    const section = await ctx.db.get(args.coreSectionId);
+    if (!section) {
+      throw new Error("Section not found");
+    }
+
+    const playlist = await ctx.db.get(section.corePlaylistId);
+    if (!playlist || playlist.status === "published") {
+      throw new Error("Cannot modify published core playlist");
+    }
+
+    // Update order for each item
+    for (const item of args.reorderedItems) {
+      await ctx.db.patch(item.id, {
+        order: item.order
+      });
+    }
+
+    return { success: true };
+  },
+});
+
+// Remove single section media
+export const removeSectionMedia = mutation({
+  args: {
+    sectionMediaId: v.id("sectionMedias")
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
+
+    // Get section media
+    const sectionMedia = await ctx.db.get(args.sectionMediaId);
+    if (!sectionMedia) {
+      throw new Error("Section media not found");
+    }
+
+    // Validate section exists and playlist is in draft
+    const section = await ctx.db.get(sectionMedia.coreSectionId);
+    if (!section) {
+      throw new Error("Section not found");
+    }
+
+    const playlist = await ctx.db.get(section.corePlaylistId);
+    if (!playlist || playlist.status === "published") {
+      throw new Error("Cannot modify published core playlist");
+    }
+
+    // Delete the section media
+    await ctx.db.delete(args.sectionMediaId);
+
+    return { success: true };
+  },
+});
+
+// Batch add medias to section
+export const batchAddMediasToSection = mutation({
+  args: {
+    coreSectionId: v.id("coreSections"),
+    coreMediaIds: v.array(v.id("medias")),
+    startOrder: v.optional(v.number())
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; addedCount: number; skippedCount: number; }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
+
+    // Validate section exists and playlist is in draft
+    const section = await ctx.db.get(args.coreSectionId);
+    if (!section) {
+      throw new Error("Section not found");
+    }
+
+    const playlist = await ctx.db.get(section.corePlaylistId);
+    if (!playlist || playlist.status === "published") {
+      throw new Error("Cannot modify published core playlist");
+    }
+
+    // Get starting order
+    let order = args.startOrder || 1;
+    if (!args.startOrder) {
+      const lastMedia = await ctx.db
+        .query("sectionMedias")
+        .withIndex("by_core_section_order", (q) => q.eq("coreSectionId", args.coreSectionId))
+        .order("desc")
+        .first();
+      order = lastMedia ? lastMedia.order + 1 : 1;
+    }
+
+    // Add each media to the section
+    const addedMediaIds = [];
+    for (const coreMediaId of args.coreMediaIds) {
+      // Check if media already exists in section
+      const existing = await ctx.db
+        .query("sectionMedias")
+        .withIndex("by_core_section", (q) => q.eq("coreSectionId", args.coreSectionId))
+        .filter((q) => q.eq(q.field("coreMediaId"), coreMediaId))
+        .unique();
+
+      if (!existing) {
+        await ctx.db.insert("sectionMedias", {
+          coreSectionId: args.coreSectionId,
+          coreMediaId: coreMediaId,
+          order: order++,
+          isOptional: false,
+          defaultSelected: true,
+        });
+        addedMediaIds.push(coreMediaId);
+      }
+    }
+
+    return {
+      success: true,
+      addedCount: addedMediaIds.length,
+      skippedCount: args.coreMediaIds.length - addedMediaIds.length
+    };
+  },
+});
+
+// Batch remove medias from section
+export const batchRemoveMediasFromSection = mutation({
+  args: {
+    coreSectionId: v.id("coreSections"),
+    coreMediaIds: v.array(v.id("medias"))
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; removedCount: number; }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
+
+    // Validate section exists and playlist is in draft
+    const section = await ctx.db.get(args.coreSectionId);
+    if (!section) {
+      throw new Error("Section not found");
+    }
+
+    const playlist = await ctx.db.get(section.corePlaylistId);
+    if (!playlist || playlist.status === "published") {
+      throw new Error("Cannot modify published core playlist");
+    }
+
+    let removedCount = 0;
+    for (const coreMediaId of args.coreMediaIds) {
+      const sectionMedia = await ctx.db
+        .query("sectionMedias")
+        .withIndex("by_core_section", (q) => q.eq("coreSectionId", args.coreSectionId))
+        .filter((q) => q.eq(q.field("coreMediaId"), coreMediaId))
+        .unique();
+
+      if (sectionMedia) {
+        await ctx.db.delete(sectionMedia._id);
+        removedCount++;
+      }
+    }
+
+    return {
+      success: true,
+      removedCount
     };
   },
 });

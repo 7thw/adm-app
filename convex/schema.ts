@@ -203,8 +203,8 @@ const applicationTables = {
   // User media selections and progress
   userMediaSelections: defineTable({
     userPlaylistId: v.id("userPlaylists"),
-    sectionId: v.id("coreSections"),
-    mediaId: v.id("medias"),
+    coreSectionId: v.id("coreSections"),
+    coreMediaId: v.id("medias"),
     isSelected: v.boolean(),
     playOrder: v.number(),
     completedAt: v.optional(v.number()),
@@ -212,15 +212,14 @@ const applicationTables = {
     lastPosition: v.optional(v.number()), // playback position in seconds
   })
     .index("by_user_playlist", ["userPlaylistId"])
-    .index("by_section", ["sectionId"])
-    .index("by_media", ["mediaId"])
+    .index("by_core_section", ["coreSectionId"])
+    .index("by_core_media", ["coreMediaId"])
     .index("by_selected", ["isSelected"])
     .index("by_user_playlist_selected", ["userPlaylistId", "isSelected"]),
 
   // User player settings
   userPlayerSettings: defineTable({
     userId: v.id("users"),
-    // Player preferences
     maxLoop: v.number(), // 0 = no loop, -1 = infinite
     countDownTimer: v.number(), // in minutes
     volume: v.number(), // 0-100
