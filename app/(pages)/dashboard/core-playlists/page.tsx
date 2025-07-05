@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { api } from "@/convex/_generated/api";
 import { Doc, Id } from "@/convex/_generated/dataModel";
-import { useMutation, useQuery } from "convex/react";
-import { Copy, Edit, Link, List, Loader2, PlusCircle, Search } from "lucide-react";
+import { useQuery } from "convex/react";
+import { Edit, Link, List, Loader2, PlusCircle, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -24,8 +24,6 @@ export default function CorePlaylistsPage() {
   // Get categories to display category names
   const categories = useQuery(api.admin.listCoreCategories, {}) || [];
 
-  // Mutations for core playlist operations
-  const duplicateCorePlaylist = useMutation(api.admin.duplicateCorePlaylist);
 
   // Loading state based on Convex query
   const isLoading = corePlaylists === undefined;
@@ -49,24 +47,6 @@ export default function CorePlaylistsPage() {
   // Handler for opening create modal
   const handleCreateCorePlaylist = () => {
     setIsCreateModalOpen(true);
-  };
-
-  // Handler for duplicating core playlist
-  const handleDuplicateCorePlaylist = async (corePlaylist: Doc<"corePlaylists">) => {
-    try {
-      const newTitle = `${corePlaylist.title} (Copy)`;
-      const newCorePlaylistId = await duplicateCorePlaylist({
-        sourcePlaylistId: corePlaylist._id,
-        newTitle,
-        keepSections: true, // Include sections in the duplicate
-      });
-
-      toast.success(`Core playlist duplicated successfully!`);
-      router.push(`/dashboard/core-playlists/${newCorePlaylistId}/edit`);
-    } catch (error) {
-      console.error("Error duplicating core playlist:", error);
-      toast.error("Failed to duplicate core playlist");
-    }
   };
 
   return (
@@ -137,15 +117,6 @@ export default function CorePlaylistsPage() {
                     >
                       <Link className="h-4 w-4" />
                       Mobile Preview
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDuplicateCorePlaylist(corePlaylist)}
-                      className="gap-2"
-                    >
-                      <Copy className="h-4 w-4" />
-                      Duplicate
                     </Button>
                   </div>
                   <Button

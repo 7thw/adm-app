@@ -15,7 +15,7 @@ const applicationTables = {
   // =================================================================
   // USER ROLES & ORGANIZATION MANAGEMENT
   // =================================================================
-  
+
   // Organization roles for admin access control
   organizationRoles: defineTable({
     userId: v.id("users"),
@@ -75,17 +75,17 @@ const applicationTables = {
     .index("by_active", ["isActive"])
     .index("by_order", ["order"])
     .index("by_slug", ["slug"])
-    .index("by_active_order", ["isActive", "order"]),
+    .index("by_active_order", ["isActive", "order"])
+    .index("by_created_by", ["createdBy"]),
 
-  // Media files with proper file storage integration
-  medias: defineTable({
+  // Core media files with proper file storage integration
+  coreMedias: defineTable({
     title: v.string(),
     description: v.optional(v.string()),
     mediaType: v.union(v.literal("audio"), v.literal("video")),
     // For audio files uploaded to R2 storage
     r2Key: v.optional(v.string()), // R2 object key for management
-    // Legacy Convex storage (for migration)
-    storageId: v.optional(v.id("_storage")),
+    storageId: v.optional(v.id("_storage")), // Legacy Convex storage (for migration)
     // For video embeds (YouTube, etc.)
     embedUrl: v.optional(v.string()),
     youtubeId: v.optional(v.string()),
@@ -108,18 +108,18 @@ const applicationTables = {
     quality: v.optional(v.string()),
     bitrate: v.optional(v.number()),
     // Ownership and access
-    uploadedBy: v.id("users"),
+    createdBy: v.id("users"),
     isPublic: v.boolean(),
   })
     .index("by_type", ["mediaType"])
     .index("by_status", ["processingStatus"])
-    .index("by_uploader", ["uploadedBy"])
     .index("by_public", ["isPublic"])
-    .index("by_type_public", ["mediaType", "isPublic"]),
+    .index("by_type_public", ["mediaType", "isPublic"])
+    .index("by_created_by", ["createdBy"]),
 
-  // Media tags for better organization
-  mediaTags: defineTable({
-    coreMediaId: v.id("medias"),
+  // Core media tags for better organization
+  coreMediaTags: defineTable({
+    coreMediaId: v.id("coreMedias"),
     tag: v.string(),
     createdAt: v.number(),
   })
@@ -145,7 +145,7 @@ const applicationTables = {
     .index("by_category", ["categoryId"])
     .index("by_category_status", ["categoryId", "status"])
     .index("by_published", ["status", "publishedAt"])
-    .index("by_creator", ["createdBy"]),
+    .index("by_created_by", ["createdBy"]),
 
   // Sections within core playlists
   coreSections: defineTable({
@@ -163,17 +163,19 @@ const applicationTables = {
     .index("by_core_playlist_order", ["corePlaylistId", "order"])
     .index("by_type", ["sectionType"]),
 
-  // Media items within sections
-  sectionMedias: defineTable({
+  // Core section media relationships
+  coreSectionMedias: defineTable({
     coreSectionId: v.id("coreSections"),
-    coreMediaId: v.id("medias"),
+    coreMediaId: v.id("coreMedias"),
     order: v.number(),
     isOptional: v.boolean(),
     defaultSelected: v.boolean(),
   })
     .index("by_core_section", ["coreSectionId"])
     .index("by_core_section_order", ["coreSectionId", "order"])
-    .index("by_core_media", ["coreMediaId"]),
+    .index("by_core_media", ["coreMediaId"])
+    .index("by_core_section_media", ["coreSectionId", "coreMediaId"])
+    .index("by_core_section_media_order", ["coreSectionId", "coreMediaId", "order"]),
 
   // =================================================================
   // USER CUSTOMIZATION & EXPERIENCE (PWA App)
@@ -204,7 +206,7 @@ const applicationTables = {
   userMediaSelections: defineTable({
     userPlaylistId: v.id("userPlaylists"),
     coreSectionId: v.id("coreSections"),
-    coreMediaId: v.id("medias"),
+    coreMediaId: v.id("coreMedias"),
     isSelected: v.boolean(),
     playOrder: v.number(),
     completedAt: v.optional(v.number()),
@@ -219,6 +221,7 @@ const applicationTables = {
 
   // User player settings
   userPlayerSettings: defineTable({
+
     userId: v.id("users"),
     maxLoop: v.number(), // 0 = no loop, -1 = infinite
     countDownTimer: v.number(), // in minutes
@@ -229,7 +232,7 @@ const applicationTables = {
     backgroundPlayback: v.boolean(),
     // Current session state
     currentPlaylistId: v.optional(v.id("userPlaylists")),
-    currentMediaId: v.optional(v.id("medias")),
+    currentMediaId: v.optional(v.id("coreMedias")),
     currentPosition: v.number(), // in seconds
     // Offline settings
     downloadQuality: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
@@ -238,6 +241,23 @@ const applicationTables = {
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"]),
+
+  // User playback progress tracking
+  userPlaybackProgress: defineTable({
+    userId: v.id("users"),
+    userPlaylistId: v.id("userPlaylists"),
+    coreMediaId: v.id("coreMedias"),
+    position: v.number(), // Current playback position in seconds
+    duration: v.number(), // Total duration in seconds
+    completedAt: v.optional(v.number()), // Timestamp when completed
+    isCompleted: v.boolean(),
+    sessionId: v.optional(v.string()),
+    timestamp: v.number(), // Last update timestamp
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_playlist", ["userId", "userPlaylistId"])
+    .index("by_user_media", ["userId", "coreMediaId"])
+    .index("by_session", ["sessionId"]),
 
   // =================================================================
   // SUBSCRIPTION & BILLING INTEGRATION
@@ -285,7 +305,7 @@ const applicationTables = {
     eventType: v.string(), // "playlist_created", "media_played", etc.
     eventData: v.optional(v.string()), // JSON string of event details
     userPlaylistId: v.optional(v.id("userPlaylists")),
-    mediaId: v.optional(v.id("medias")),
+    mediaId: v.optional(v.id("coreMedias")),
     sessionId: v.optional(v.string()),
     deviceType: v.optional(v.string()),
     userAgent: v.optional(v.string()),
@@ -357,7 +377,7 @@ const applicationTables = {
       v.literal("failed")
     ),
     storageId: v.optional(v.id("_storage")),
-    mediaId: v.optional(v.id("medias")),
+    mediaId: v.optional(v.id("coreMedias")),
     uploadedBy: v.id("users"),
     uploadProgress: v.optional(v.number()), // 0-100
     errorMessage: v.optional(v.string()),

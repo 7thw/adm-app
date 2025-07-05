@@ -12,6 +12,7 @@ import type * as admin from "../admin.js";
 import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
 import type * as clerkSync from "../clerkSync.js";
+import type * as debug_functions from "../debug_functions.js";
 import type * as http from "../http.js";
 import type * as internal_webhooks from "../internal/webhooks.js";
 import type * as r2Upload from "../r2Upload.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   analytics: typeof analytics;
   auth: typeof auth;
   clerkSync: typeof clerkSync;
+  debug_functions: typeof debug_functions;
   http: typeof http;
   "internal/webhooks": typeof internal_webhooks;
   r2Upload: typeof r2Upload;

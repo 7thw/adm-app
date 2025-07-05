@@ -1,5 +1,7 @@
 "use client"
 
+import { MediaCellPlayer } from "@/components/medias/MediaCellPlayer"
+import { Doc } from "@/convex/_generated/dataModel"
 import { type UniqueIdentifier } from "@dnd-kit/core"
 import {
   IconChevronDown,
@@ -8,11 +10,9 @@ import {
   IconChevronsLeft,
   IconChevronsRight,
   IconLayoutColumns,
-  IconPlayerPlayFilled,
   IconPlus,
   IconTrashFilled
 } from "@tabler/icons-react"
-import { MediaCellPlayer } from "@/components/medias/MediaCellPlayer"
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -30,10 +30,7 @@ import {
 } from "@tanstack/react-table"
 import * as React from "react"
 import { toast } from "sonner"
-import { Doc } from "@/convex/_generated/dataModel"
 
-import MediaPlayer from "@/components/medias/MediaPlayer"
-import MediaInfo from "@/components/medias/media-info"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -93,7 +90,7 @@ import FormMedia from "./FormMedia"
 // This ensures single source of truth from the database schema
 // Drag functionality has been removed
 
-export const columns: ColumnDef<Doc<"medias">>[] = [
+export const columns: ColumnDef<Doc<"coreMedias">>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -206,7 +203,7 @@ export const columns: ColumnDef<Doc<"medias">>[] = [
   },
 ]
 
-function DataTableRow({ row }: { row: Row<Doc<"medias">> }) {
+function DataTableRow({ row }: { row: Row<Doc<"coreMedias">> }) {
   return (
     <TableRow data-state={row.getIsSelected() && "selected"}>
       {row.getVisibleCells().map((cell) => (
@@ -221,11 +218,11 @@ function DataTableRow({ row }: { row: Row<Doc<"medias">> }) {
 export function DataTable({
   data: initialData,
 }: {
-  data: Doc<"medias">[]
+  data: Doc<"coreMedias">[]
 }) {
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [activeFilter, setActiveFilter] = React.useState<"all" | "audio" | "video">("all")
-  const [data, setData] = React.useState<Doc<"medias">[]>(initialData)
+  const [data, setData] = React.useState<Doc<"coreMedias">[]>(initialData)
   // TODO: Implement deleteMedia function in Convex backend
   // const deleteMediaMutation = useMutation(api.admin.deleteMedia);
 
@@ -783,7 +780,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-function TableCellViewer({ item }: { item: Doc<"medias"> }) {
+function TableCellViewer({ item }: { item: Doc<"coreMedias"> }) {
   return (
     <Drawer>
       <DrawerTrigger asChild>

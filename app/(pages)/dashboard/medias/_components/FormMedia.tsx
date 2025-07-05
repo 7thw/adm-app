@@ -7,7 +7,6 @@ import { Progress } from "@/components/ui/progress"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { api } from "@/convex/_generated/api"
-import { Id } from "@/convex/_generated/dataModel"
 import { useUploadFile } from "@convex-dev/r2/react"
 import { useMutation } from "convex/react"
 import { FileAudio, Loader2, Music, Video } from "lucide-react"
@@ -75,7 +74,7 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
   const [uploadProgress, setUploadProgress] = useState(0)
 
   // Convex Hooks
-  const createMedia = useMutation(api.admin.createMedia)
+  const createMedia = useMutation(api.admin.createCoreMedia)
   const uploadFile = useUploadFile(api.r2Upload)
   const createCoreMediaRecord = useMutation(api.r2Upload.createCoreMediaRecord)
 
@@ -157,7 +156,7 @@ export default function FormMedia({ onSuccess }: FormMediaProps) {
         // Upload file to R2 using the official R2 hook
         // The uploadFile function returns the R2 key directly
         const r2Key = await uploadFile(selectedFile)
-        
+
         // Create core media record with R2 data
         await createCoreMediaRecord({
           title,

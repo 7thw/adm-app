@@ -28,10 +28,7 @@ import {
   TableRow
 } from "@/components/ui/table"
 import { Doc } from "@/convex/_generated/dataModel"
-import {DraggableContainer} from "@/components/dnd/draggable-container";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Loader2} from "lucide-react";
-import {useRouter} from "next/navigation";
+import { useRouter } from "next/navigation"
 interface CorePlaylistPageProps {
   params: {
     corePlaylistId: string
@@ -52,31 +49,32 @@ export default function CorePlaylistPage({ params }: CorePlaylistPageProps) {
 }
 
 // Use Convex-generated types as source of truth
-type MediaDetails = Doc<"medias">
+type MediaDetails = Doc<"coreMedias">
+type SectionMedias = Doc<"coreMedias">
 // SectionMediaRaw represents the join table between sections and media
 
 // Use Convex schema directly instead of custom type definitions
 // This avoids redundant type definitions that can drift from the schema
-type SectionMediaRaw = {
-  _id: Id<"sectionMedias">
-  _creationTime: number
-  sectionId: Id<"coreSections">
-  mediaId: Id<"medias">
-  order: number
-  isRequired?: boolean
-  isOptional?: boolean
-  defaultSelected?: boolean
-}
+// type SectionMediaRaw = {
+//   _id: Id<"coreMedias">
+//   _creationTime: number
+//   sectionId: Id<"coreSections">
+//   mediaId: Id<"coreMedias">
+//   order: number
+//   isRequired?: boolean
+//   isOptional?: boolean
+//   defaultSelected?: boolean
+// }
 
 // This type represents the data structure used in the UI
-type SectionMediaItem = {
-  _id: Id<"sectionMedias">
-  sectionId: Id<"coreSections">
-  mediaId: Id<"medias">
-  order: number
-  selectMedia: boolean // Mapped from isRequired/defaultSelected
-  media: MediaDetails | null
-}
+// type SectionMediaItem = {
+//   _id: Id<"coreSectionMedias">
+//   sectionId: Id<"coreSections">
+//   mediaId: Id<"coreMedias">
+//   order: number
+//   selectMedia: boolean // Mapped from isRequired/defaultSelected
+//   media: MediaDetails | null
+// }
 
 type SectionMediaTableProps = {
   sectionId: Id<"coreSections">
@@ -86,9 +84,9 @@ type SectionMediaTableProps = {
 
 // Sortable item component for drag and drop
 function SortableMediaRow({ item, onToggleSelect, onDelete, onPlayMedia }: {
-  item: SectionMediaItem
-  onToggleSelect: (id: Id<"sectionMedias">, selected: boolean) => void
-  onDelete: (id: Id<"sectionMedias">) => void
+  item: SectionMedias
+  onToggleSelect: (id: Id<"coreSectionMedias">, selected: boolean) => void
+  onDelete: (id: Id<"coreSectionMedias">) => void
   onPlayMedia?: (media: MediaDetails) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item._id.toString() })
@@ -154,9 +152,9 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
   const [selectedCount, setSelectedCount] = useState(0)
 
   // State for batch operations
-  const [batchSelectedIds, setBatchSelectedIds] = useState<Set<Id<"sectionMedias">>>(new Set())
+  const [batchSelectedIds, setBatchSelectedIds] = useState<Set<Id<"coreSectionMedias">>>(new Set())
   const [showBatchActions, setShowBatchActions] = useState(false)
-  const [availableMediaForBatch, setAvailableMediaForBatch] = useState<Doc<"medias">[]>([])
+  const [availableMediaForBatch, setAvailableMediaForBatch] = useState<Doc<"coreMedias">[]>([])
   const [showMediaSelector, setShowMediaSelector] = useState(false)
 
   // Sensors for drag and drop
@@ -168,7 +166,8 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
   )
 
   // Fetch section media from Convex
-  const sectionMediaResult = useQuery(api.admin.listSectionMedia, { coreSectionId: sectionId
+  const sectionMediaResult = useQuery(api.admin.listSectionMedia, {
+    coreSectionId: sectionId
 
   }) as SectionMediaRaw[] || []
 
@@ -243,9 +242,9 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
       }
 
       // Update selection in Convex
-      await updateSelection({ 
-        sectionMediaId: id, 
-        defaultSelected: selected 
+      await updateSelection({
+        sectionMediaId: id,
+        defaultSelected: selected
       })
 
       // Update local state
@@ -307,7 +306,7 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
       const mediaIds = Array.from(batchSelectedIds).map(id => {
         const item = sortedMedia.find(media => media._id === id)
         return item?.mediaId
-      }).filter(Boolean) as Id<"medias">[]
+      }).filter(Boolean) as Id<"coreMedias">[]
 
       await batchRemoveMedias({
         coreSectionId: sectionId,
@@ -322,7 +321,7 @@ export function SectionMediaTable({ sectionId, maxSelectMedia, onPlayMedia }: Se
     }
   }
 
-  const handleBatchAdd = async (selectedMediaIds: Id<"medias">[]) => {
+  const handleBatchAdd = async (selectedMediaIds: Id<"coreMedias">[]) => {
     if (selectedMediaIds.length === 0) return
 
     try {

@@ -73,7 +73,7 @@ export const createCoreMediaRecord = mutation({
     // Create core media record with R2 data
     // Note: We store only the r2Key, not r2Url (which would expire)
     // Signed URLs should be generated dynamically when media is accessed
-    const coreMediaId = await ctx.db.insert("medias", {
+    const coreMediaId = await ctx.db.insert("coreMedias", {
       title: args.title,
       description: args.description,
       mediaType: args.mediaType,

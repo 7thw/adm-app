@@ -7,7 +7,7 @@ import MediaPlayer from "./MediaPlayer"
 
 // Define the MediaItem type based on what's used in the app
 interface MediaItem {
-  _id: Id<"medias">
+  _id: Id<"coreMedias">
   title: string
   description: string
   fileUrl: string

@@ -335,15 +335,10 @@ export function DataTable<TData extends TableData>({
           setData(data)
         }
       } else {
-        // Default reorder using Convex mutation
+        // Just update local state - order saved on publish
         try {
-          if (data.length > 0 && '_id' in data[0]) {
-            // Check the expected parameters for reorderSections
-            await reorderSections({
-              sectionOrders: newData.map(item => ({ id: item._id, order: item.order })) as { id: Id<"coreSections">; order: number }[],
-            })
-            toast.success("Sections reordered successfully")
-          }
+          setData(newData)
+          toast.success("Sections reordered")
         } catch (error) {
           console.error("Error reordering sections:", error)
           toast.error("Failed to reorder sections")

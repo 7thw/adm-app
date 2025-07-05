@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface MediaItem {
-  _id: Id<"medias">
+  _id: Id<"coreMedias">
   title: string
   description?: string
   mediaType: "audio" | "video"
